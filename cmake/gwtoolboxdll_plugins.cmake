@@ -43,3 +43,4 @@ endmacro()
 
 add_tb_plugin(ExamplePlugin)
 add_tb_plugin(TargetEverything)
+add_tb_plugin(DialogsWindow)
