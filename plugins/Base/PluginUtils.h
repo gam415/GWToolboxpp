@@ -97,6 +97,16 @@ namespace PluginUtils {
         return IniToMap<T>(ini, section, name);
     }
 
+    enum class SkillbarLayout { Row, Rows, Column, Columns };
+    struct SkillbarInfo {
+        SkillbarLayout layout = SkillbarLayout::Row;
+        float width = 0;
+        float height = 0;
+        std::array<ImVec2, 8> positions;
+    };
+    std::optional<SkillbarInfo> getSkillbarInfo();
+    void logMessage(std::string_view message, std::string_view pluginName);
+
     // Takes a wstring and translates into a string of hex values, separated by spaces
     bool ArrayToIni(const std::wstring& in, std::string* out);
     bool ArrayToIni(const uint32_t* in, size_t len, std::string* out);
