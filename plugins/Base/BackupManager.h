@@ -1,10 +1,11 @@
 #pragma once
 
-#include <filesystem>
-#include <optional>
 #include <string>
+#include <optional>
+#include <filesystem>
 
-class BackupManager {
+class BackupManager 
+{
 public:
     static BackupManager& getInstance()
     {

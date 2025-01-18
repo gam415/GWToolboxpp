@@ -801,7 +801,6 @@ namespace PluginUtils {
         return decoded_s;
     }
 
-    
     std::optional<SkillbarInfo> getSkillbarInfo()
     {
         SkillbarInfo result;

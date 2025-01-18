@@ -1,8 +1,8 @@
 #include <BackupManager.h>
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <chrono>
 
 namespace {
     constexpr auto maxBackupsPerPlugin = 9;
@@ -58,9 +58,10 @@ void BackupManager::save(std::wstring_view pluginName, std::filesystem::path con
 
     if (backupCount(pluginName) >= maxBackupsPerPlugin) {
         const auto oldestEntry = getOldestEntry(pluginBackupFolder);
-        if (oldestEntry.wstring().ends_with(L".txt")) std::filesystem::remove(oldestEntry);
+        if (oldestEntry.wstring().ends_with(L".txt")) 
+            std::filesystem::remove(oldestEntry);
     }
-
+    
     const auto filePath = [&] {
         int backupIndex = 0;
         while (true) 
@@ -89,8 +90,9 @@ std::vector<std::filesystem::path> BackupManager::list(std::wstring_view pluginN
     const auto pluginBackupFolder = basePath / pluginName;
     std::vector<std::filesystem::path> result;
     if (!std::filesystem::exists(pluginBackupFolder)) return result;
-
-    for (const auto& entry : std::filesystem::directory_iterator{pluginBackupFolder}) {
+    
+    for (const auto& entry : std::filesystem::directory_iterator{pluginBackupFolder})
+    {
         result.push_back(entry.path());
     }
     return result;
@@ -102,7 +104,8 @@ std::filesystem::path BackupManager::load(std::wstring_view pluginName, BackupMa
     if (!std::filesystem::exists(pluginBackupFolder)) return {};
 
     std::filesystem::path fileToLoad = "";
-    switch (type) {
+    switch (type) 
+    {
         case BackupManager::LoadType::Largest:
             fileToLoad = getLargestEntry(pluginBackupFolder);
             break;

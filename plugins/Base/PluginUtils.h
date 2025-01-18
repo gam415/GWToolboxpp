@@ -55,6 +55,7 @@ namespace PluginUtils {
 
     // Extract first unencoded substring from gw encoded string. Pass second and third args to know where the player name was found in the original string.
     std::wstring GetPlayerNameFromEncodedString(const wchar_t* message, const wchar_t** start_pos_out = nullptr, const wchar_t** out_pos_out = nullptr);
+    void logMessage(std::string_view message, std::string_view pluginName);
 
     bool ParseInt(const char* str, int* val, int base = 0);
     bool ParseInt(const wchar_t* str, int* val, int base = 0);
