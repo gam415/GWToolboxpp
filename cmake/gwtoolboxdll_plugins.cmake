@@ -45,6 +45,7 @@ endmacro()
 
 add_tb_plugin(AgentPopTimer)
 add_tb_plugin(DeathPenaltyTimer)
+add_tb_plugin(DhuumCalculator)
 add_tb_plugin(DialogsWindow)
 add_tb_plugin(ExamplePlugin)
 add_tb_plugin(FlatBowRangeIndicator)
