@@ -1,5 +1,7 @@
 #include "DeathPenaltyTimer.h"
 
+#include "FontLoader.h"
+
 #include <chrono>
 
 #include <GWCA/GWCA.h>
@@ -12,7 +14,6 @@
 #include <GWCA/Managers/AgentMgr.h>
 #include <GWCA/Managers/MapMgr.h>
 
-#include <Utils/FontLoader.h>
 #include <WICTextureLoader/WICTextureLoader9.h>
 
 DLLAPI ToolboxPlugin* ToolboxPluginInstance()
@@ -152,7 +153,7 @@ void DeathPenaltyTimer::drawCircleSegment(float circlePortion, float thickness) 
         const auto centiseconds = (int)(150 * (1.f - circlePortion));
         const auto text = std::to_string(centiseconds / 10) + "." + std::to_string(centiseconds % 10);
         ImGui::PushStyleColor(ImGuiCol_Text, color);
-        //ImGui::PushFont(FontLoader::GetFont(FontLoader::font_sizes[fontSizeIndex + 3]));
+        ImGui::PushFont(FontLoader::GetFont(FontLoader::font_sizes[fontSizeIndex + 3]));
         const auto textSize = ImGui::CalcTextSize(text.c_str());
         yOffset = showIcon && texture ? (textSize.y + imageSizes[imageSizeIndex].y) / 2 : 0;
 

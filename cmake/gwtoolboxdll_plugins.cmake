@@ -4,6 +4,11 @@ target_sources(plugin_base INTERFACE
     "plugins/Base/stl.h"
     "plugins/Base/BackupManager.h"
     "plugins/Base/BackupManager.cpp"
+	"plugins/Base/FontLoader.h"
+	"plugins/Base/FontLoader.cpp"
+	"plugins/Base/toolbox_default_font.h"
+	"plugins/Base/imgui_impl_dx9.h"
+	"plugins/Base/imgui_impl_dx9.cpp"
     "plugins/Base/ToolboxPlugin.h"
     "plugins/Base/ToolboxPlugin.cpp"
     "plugins/Base/Pathing.h"
@@ -21,10 +26,9 @@ target_include_directories(plugin_base INTERFACE
     )
 target_link_libraries(plugin_base INTERFACE
     imgui
+	imgui::fonts
     nlohmann_json::nlohmann_json
     gwca
-    IconFontCppHeaders
-    GWToolboxdll # for GetFont
 	Microsoft::DirectXTex
 	directxtexloader
     )

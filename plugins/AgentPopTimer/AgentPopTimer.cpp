@@ -1,5 +1,7 @@
 #include "AgentPopTimer.h"
 
+#include "FontLoader.h"
+
 #include <chrono>
 
 #include <GWCA/GWCA.h>
@@ -7,7 +9,6 @@
 #include <GWCA/Constants/ItemIds.h>
 #include <GWCA/Constants/Constants.h>
 #include <GWCA/Packets/StoC.h>
-#include <Utils/FontLoader.h>
 
 #include <GWCA/Managers/UIMgr.h>
 #include <GWCA/Managers/ItemMgr.h>
@@ -254,7 +255,7 @@ void AgentPopTimer::drawCircleSegment(float circlePortion, float thickness) cons
     if (showIcon && texture) 
     {
         const auto imageSize = imageSizes[imageSizeIndex];
-        ImGui::SetCursorPos((size + thickness - imageSize) * 0.5f - ImVec2(0, yOffset/4) + offset);
+        ImGui::SetCursorPos((size + thickness) * 0.5 - imageSize * 0.25  - ImVec2(0, yOffset/4) + offset);
         ImGui::Image((ImTextureID)(intptr_t)*texture, imageSize);
     }
 }

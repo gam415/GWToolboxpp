@@ -2,7 +2,9 @@
 
 #include <GWCA/Constants/Constants.h>
 #include <ToolboxIni.h>
+
 #include <nlohmann/json.hpp>
+#include <imgui.h>
 
 namespace PluginUtils {
     template <typename T>
