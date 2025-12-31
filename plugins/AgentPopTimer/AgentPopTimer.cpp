@@ -351,8 +351,6 @@ void AgentPopTimer::SaveSettings(const wchar_t* folder)
 void AgentPopTimer::Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMODULE toolbox_dll)
 {
     ToolboxUIPlugin::Initialize(ctx, allocator_fns, toolbox_dll);
-    
-    GW::Initialize();
 
     using namespace std::chrono_literals;
     mpStatus.poppedMinipetId = std::nullopt;
@@ -391,8 +389,10 @@ void AgentPopTimer::Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, H
     });
 }
 
-void AgentPopTimer::Terminate()
+void AgentPopTimer::SignalTerminate()
 {
-    GW::Terminate();
-    ToolboxUIPlugin::Terminate();
+    GW::StoC::RemoveCallback<GW::Packet::StoC::InstanceLoadFile>(&InstanceLoadFile_Entry);
+    GW::UI::RemoveUIMessageCallback(&UseItem_Entry, GW::UI::UIMessage::kSendUseItem);
+
+    ToolboxUIPlugin::SignalTerminate();
 }

@@ -155,7 +155,6 @@ void PitsSoulsWindow::DrawSettings()
 void PitsSoulsWindow::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_dll)
 {
     ToolboxUIPlugin::Initialize(ctx, fns, toolbox_dll);
-    GW::Initialize();
 
     resetSouls();
     GW::StoC::RegisterPostPacketCallback<GW::Packet::StoC::InstanceLoadFile>(&InstanceLoadFile_Entry, [this](GW::HookStatus*, const GW::Packet::StoC::InstanceLoadFile*) {
@@ -167,15 +166,4 @@ void PitsSoulsWindow::SignalTerminate()
     ToolboxUIPlugin::SignalTerminate();
 
     GW::StoC::RemovePostCallback<GW::Packet::StoC::InstanceLoadFile>(&InstanceLoadFile_Entry);
-    GW::DisableHooks();
-}
-bool PitsSoulsWindow::CanTerminate()
-{
-    return GW::HookBase::GetInHookCount() == 0;
-}
-
-void PitsSoulsWindow::Terminate()
-{
-    ToolboxPlugin::Terminate();
-    GW::Terminate();
 }

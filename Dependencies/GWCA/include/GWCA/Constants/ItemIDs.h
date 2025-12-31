@@ -10,6 +10,12 @@ namespace GW {
             constexpr int GhastlyStone = 32557;
             constexpr int LegionnaireStone = 37810;
 
+            // Targetable minipets
+            constexpr int GuildLord = 36648;
+            constexpr int HighPriestZhang = 36649;
+            constexpr int GhostlyPriest = 36650;
+            constexpr int RiftWarden = 36651;
+
             // materials
             constexpr int Bone = 921;
             constexpr int BoltofCloth = 925;

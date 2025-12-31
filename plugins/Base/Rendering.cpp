@@ -166,23 +166,24 @@ namespace {
         if (poly.vb) return true; // Already created the vertex buffer for this poly, which means altitudes have been done!
         auto& vertices = poly.vertices;
         if (poly.vertices_processed == vertices.size()) return true;
-        // altitudes (Z value) for each vertex can't be known until we are in the correct map,
-        // so these are dynamically computed, one-time.
-        float altitude = ALTITUDE_UNKNOWN;
-
+        
         // in order to properly query altitudes, we have to use the pathing map
         // to determine the number of Z planes in the current map.
         const GW::PathingMapArray* pathing_map = GW::Map::GetPathingMap();
         if (!pathing_map || pathing_map->size() == 0) return false;
 
         const auto z_plane0 = poly.vertices_zplanes[0];
-        GW::Map::QueryAltitude({vertices[0].x, vertices[0].y, z_plane0}, 5.f, altitude);
+
+        auto queryPos = GW::GamePos{vertices[0].x, vertices[0].y, z_plane0};
+        auto altitude = GW::Map::QueryAltitude(&queryPos, 5.f);
+        
         const auto altitude0 = altitude;
         ++poly.vertices_processed;
         vertices[0].z = altitude;
 
         const auto z_planeZ = poly.vertices_zplanes[vertices.size() - 1];
-        GW::Map::QueryAltitude({vertices[vertices.size() - 1].x, vertices[vertices.size() - 1].y, z_planeZ}, 5.f, altitude);
+        queryPos = GW::GamePos{vertices[vertices.size() - 1].x, vertices[vertices.size() - 1].y, z_planeZ};
+        GW::Map::QueryAltitude(&queryPos, 5.f);
         const auto altitudeZ = altitude;
         vertices[vertices.size() - 1].z = altitude;
 
@@ -198,7 +199,8 @@ namespace {
 
             // @Cleanup: zplane needs setting properly here!
             const auto z_plane = poly.vertices_zplanes[i];
-            GW::Map::QueryAltitude({vertices[i].x, vertices[i].y, z_plane}, 5.f, altitude);
+            queryPos = GW::GamePos{vertices[i].x, vertices[i].y, z_plane};
+            altitude = GW::Map::QueryAltitude(&queryPos, 5.f);
 
             if (altitude < vertices[i].z) {
                 // recall that the Up camera component is inverted
@@ -209,7 +211,8 @@ namespace {
             if (std::abs(altitude - guessed_altitude) > 20.f) {
                 auto min_diff = std::abs(altitude - guessed_altitude);
                 for (unsigned zplane = pathing_map->size() - 1; zplane >= 1; --zplane) {
-                    GW::Map::QueryAltitude({vertices[i].x, vertices[i].y, zplane}, 5.f, altitude);
+                    queryPos = GW::GamePos{vertices[i].x, vertices[i].y, zplane};
+                    altitude = GW::Map::QueryAltitude(&queryPos, 5.f);
                     const auto cur_diff = std::abs(altitude - guessed_altitude);
                     if (cur_diff < min_diff && altitude < vertices[i].z) {
                         min_diff = cur_diff;

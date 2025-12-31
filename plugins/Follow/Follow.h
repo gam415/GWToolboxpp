@@ -1,7 +1,10 @@
 #pragma once
 
 #include <ToolboxPlugin.h>
+
 #include <GWCA/Utilities/Hook.h>
+
+#include <IconsFontAwesome5.h>
 
 class FollowPlugin : public ToolboxPlugin {
 public:
@@ -20,8 +23,6 @@ public:
 
     void Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMODULE toolbox_dll) override;
     void SignalTerminate() override;
-    bool CanTerminate() override;
-    void Terminate() override;
 
 private:
     float followDistance = 200.f;

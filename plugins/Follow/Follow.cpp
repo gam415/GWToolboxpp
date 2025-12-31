@@ -20,6 +20,8 @@ namespace
 {
     bool following = false;
 
+    GW::HookEntry ChatCmd_HookEntry;
+
     void logMessage(std::string_view message)
     {
         const auto wMessage = std::wstring{message.begin(), message.end()};
@@ -91,9 +93,8 @@ void FollowPlugin::DrawSettings()
 void FollowPlugin::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_dll) {
 
     ToolboxPlugin::Initialize(ctx, fns, toolbox_dll);
-    GW::Initialize();
-
-    GW::Chat::CreateCommand(L"follow", [](GW::HookStatus*, const wchar_t*, const int, const LPWSTR*) 
+    
+    GW::Chat::CreateCommand(&ChatCmd_HookEntry, L"follow", [](GW::HookStatus*, const wchar_t*, const int, const LPWSTR*) 
     {
         following = !following;
         logMessage(following ? "Activated" : "Deactivated");
@@ -103,16 +104,6 @@ void FollowPlugin::SignalTerminate()
 {
     ToolboxPlugin::SignalTerminate();
 
-    GW::Chat::DeleteCommand(L"follow");
+    GW::Chat::DeleteCommand(&ChatCmd_HookEntry, L"follow");
     GW::DisableHooks();
-}
-bool FollowPlugin::CanTerminate()
-{
-    return GW::HookBase::GetInHookCount() == 0;
-}
-
-void FollowPlugin::Terminate()
-{
-    ToolboxPlugin::Terminate();
-    GW::Terminate();
 }

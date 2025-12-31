@@ -30,7 +30,6 @@ namespace {
         }
         else
         {
-            
             GW::Agents::SendDialog(dialogId);
         }
     }

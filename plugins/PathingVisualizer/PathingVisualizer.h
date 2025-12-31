@@ -9,9 +9,7 @@ public:
 
     const char* Name() const override { return "PathingVisualizer"; }
 
-    void Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMODULE toolbox_dll) override;
     void SignalTerminate() override;
-    bool CanTerminate() override;
     void Terminate() override;
 
     void DrawSettings() override;

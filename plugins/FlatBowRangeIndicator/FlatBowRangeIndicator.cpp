@@ -25,11 +25,7 @@ namespace {
 
     float getAltitude(const GW::AgentLiving* agent)
     {
-        if (!agent) return 0.f;
-
-        float altitude = 0;
-        GW::Map::QueryAltitude(agent->pos, 10, altitude);
-        return -altitude;
+        return agent ? -GW::Map::QueryAltitude(&agent->pos, 10) : 0.f;
     };
 
     enum class Result {InRange, OutOfRange, NoValidTarget};
@@ -92,15 +88,4 @@ void FlatBowRangeIndicator::DrawSettings()
     if (ImGui::IsItemClicked()) {
         ShellExecute(nullptr, "open", discordInviteLink, nullptr, nullptr, SW_SHOWNORMAL);
     }
-}
-
-void FlatBowRangeIndicator::Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMODULE toolbox_dll)
-{
-    ToolboxUIPlugin::Initialize(ctx, allocator_fns, toolbox_dll);
-    GW::Initialize();
-}
-void FlatBowRangeIndicator::Terminate()
-{
-    GW::Terminate();
-    ToolboxUIPlugin::Terminate();
 }

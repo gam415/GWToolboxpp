@@ -1,9 +1,11 @@
 #pragma once
 
 #include <ToolboxUIPlugin.h>
-#include <imgui.h>
 
-class DeathPenaltyTimer : public ToolboxUIPlugin {
+#include <IconsFontAwesome5.h>
+
+class DeathPenaltyTimer : public ToolboxUIPlugin 
+{
 public:
     DeathPenaltyTimer();
     ~DeathPenaltyTimer() override = default;

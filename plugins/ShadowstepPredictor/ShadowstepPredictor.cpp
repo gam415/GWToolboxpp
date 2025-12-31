@@ -323,13 +323,3 @@ void ShadowstepPredictor::SignalTerminate()
     GW::StoC::RemoveCallbacks(&genericValueEntry);
     GW::UI::RemoveUIMessageCallback(&skillCastEntry, GW::UI::UIMessage::kSkillActivated);
 }
-
-void ShadowstepPredictor::Terminate() 
-{
-    ToolboxUIPlugin::Terminate();
-}
-
-bool ShadowstepPredictor::CanTerminate() 
-{
-    return GW::Hook::GetInHookCount() == 0;
-}

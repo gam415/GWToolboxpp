@@ -2,6 +2,8 @@
 
 #include <ToolboxUIPlugin.h>
 
+#include <IconsFontAwesome5.h>
+
 class PitsSoulsWindow : public ToolboxUIPlugin {
 public:
     PitsSoulsWindow()
@@ -18,6 +20,4 @@ public:
 
     void Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_dll);
     void SignalTerminate();
-    bool CanTerminate();
-    void Terminate();
 };

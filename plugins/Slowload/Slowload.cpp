@@ -260,7 +260,6 @@ void Slowload::DrawSettings()
 void Slowload::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_dll)
 {
     ToolboxPlugin::Initialize(ctx, fns, toolbox_dll);
-    GW::Initialize();
 
     GW::StoC::RegisterPacketCallback<GW::Packet::StoC::InstanceLoadFile>(&instanceLoadEntry, [this](GW::HookStatus* hookStatus, GW::Packet::StoC::InstanceLoadFile* packet) {
         if (shortcutKey && status == Status::WaitingForLoadScreen)
@@ -279,16 +278,5 @@ void Slowload::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_
 void Slowload::SignalTerminate()
 {
     GW::StoC::RemoveCallback<GW::Packet::StoC::InstanceLoadFile>(&instanceLoadEntry);
-    GW::DisableHooks();
     ToolboxPlugin::SignalTerminate();
-}
-bool Slowload::CanTerminate()
-{
-    return ToolboxPlugin::CanTerminate() && GW::HookBase::GetInHookCount() == 0;
-}
-
-void Slowload::Terminate()
-{
-    GW::Terminate();
-    ToolboxPlugin::Terminate();
 }

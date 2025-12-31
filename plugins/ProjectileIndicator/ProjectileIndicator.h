@@ -6,16 +6,18 @@
 #include <GWCA/Constants/Skills.h>
 #include <GWCA/Constants/Constants.h>
 
+#include <IconsFontAwesome5.h>
+
 class ProjectileIndicator : public ToolboxUIPlugin {
 public:
     ProjectileIndicator() = default;
     ~ProjectileIndicator() override = default;
 
     const char* Name() const override { return "ProjectileIndicator"; }
+    const char* Icon() const override { return ICON_FA_CIRCLE; }
 
     void Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMODULE toolbox_dll) override;
     void SignalTerminate() override;
-    bool CanTerminate() override;
     void Terminate() override;
 
     void DrawSettings() override;
@@ -25,10 +27,10 @@ public:
     void Draw(IDirect3DDevice9*) override;
 
 private:
-    bool filled = false;
-    ImVec4 color = {1.f, 0.f, 0.f, 1.f};
+    bool filled = true;
+    ImVec4 color = {.557f, 0.f, .627f, .353f};
     int projectileTimer = 1000;
-    std::vector<GW::Constants::SkillID> trackedSkills = {GW::Constants::SkillID::Bone_Spike, GW::Constants::SkillID::Flurry_of_Splinters};
+    std::vector<GW::Constants::SkillID> trackedSkills = {};
     std::vector<int> trackedEnemyModels = {};
     std::vector<int> suppressedProjecitileAnimationSources = {};
 };

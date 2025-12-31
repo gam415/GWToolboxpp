@@ -2,7 +2,10 @@
 
 #include <ToolboxUIPlugin.h>
 
-class FlatBowRangeIndicator : public ToolboxUIPlugin {
+#include <IconsFontAwesome5.h>
+
+class FlatBowRangeIndicator : public ToolboxUIPlugin 
+{
 public:
     FlatBowRangeIndicator();
     ~FlatBowRangeIndicator() override = default;
@@ -12,7 +15,4 @@ public:
 
     void DrawSettings() override;
     void Draw(IDirect3DDevice9* pDevice) override;
-
-    void Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMODULE toolbox_dll) override;
-    void Terminate() override;
 };

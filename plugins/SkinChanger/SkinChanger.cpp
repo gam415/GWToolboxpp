@@ -68,7 +68,8 @@ namespace
         auto& decoded = decodedNames[wstring];
         if (decoded.empty()) 
         {
-            GW::GameThread::Enqueue([wstring, &decoded] { GW::UI::AsyncDecodeStr(wstring.c_str(), &decoded); });
+            decoded.reserve(256);
+            GW::GameThread::Enqueue([wstring, &decoded] { GW::UI::AsyncDecodeStr(wstring.c_str(), decoded.data(), 256); });
         }
         return removeTextInBrackets(PluginUtils::WStringToString(decoded));
     }
@@ -362,7 +363,7 @@ namespace
         const auto agent = static_cast<GW::AgentLiving*>(GW::Agents::GetAgentByID(agent_id));
         if (!agent || !agent->GetIsLivingType()) return;
         const auto existingNpc = GW::Agents::GetNPCByID(agent->player_number);
-        const auto scale = transmo.scale ? (std::max(10,std::min(255,transmo.scale)) * 0x1000000) : (existingNpc ? existingNpc->scale : 0x23000000);
+        const auto scale = transmo.scale ? (std::max(10,std::min(255,transmo.scale)) * 0x1000000) : (existingNpc ? existingNpc->visual_adjustment.scale : 0x23000000);
 
         const auto& npcs = GW::GetGameContext()->world->npcs;
         if (transmo.npcID >= (int)npcs.size() || !npcs[transmo.npcID].model_file_id) 
@@ -370,17 +371,16 @@ namespace
             GW::NPC npc = {0};
             npc.model_file_id = *npcModelFileID;
             npc.npc_flags = *flags;
-            npc.primary = 1;
             npc.default_level = 0;
             GW::GameThread::Enqueue([npcID = transmo.npcID, npc] {
                 GW::Packet::StoC::NpcGeneralStats packet{};
                 packet.npc_id = npcID;
                 packet.file_id = npc.model_file_id;
                 packet.data1 = 0;
-                packet.scale = npc.scale;
+                packet.scale = npc.visual_adjustment.scale;
                 packet.data2 = 0;
                 packet.flags = npc.npc_flags;
-                packet.profession = npc.primary;
+                packet.profession = 1;
                 packet.level = npc.default_level;
                 packet.name[0] = 0;
                 GW::StoC::EmulatePacket(&packet);
@@ -531,7 +531,7 @@ namespace
                 const auto npc = GW::Agents::GetNPCByID(npcID);
                 if (!npc) return;
                 minipetTransmog.npcTransmog.npcID = npcID;
-                minipetTransmog.npcTransmog.scale = npc->scale / 0x1000000;
+                minipetTransmog.npcTransmog.scale = npc->visual_adjustment.scale / 0x1000000;
                 minipetTransmog.npcTransmog.flags = toHexString(npc->npc_flags);
                 minipetTransmog.npcTransmog.npcModelFileID = toHexString(npc->model_file_id);
                 if (npc->files_count) 
@@ -881,7 +881,7 @@ void SkinChanger::Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMO
         minipetStatus.lastPop = std::chrono::steady_clock::now() - 1h;
     }); 
 
-    GW::Chat::CreateCommand(L"restore", [](GW::HookStatus* status, const wchar_t*, const int argc, const LPWSTR* argv) {
+    /*GW::Chat::CreateCommand(L"restore", [](GW::HookStatus* status, const wchar_t*, const int argc, const LPWSTR* argv) {
         const auto instance = static_cast<SkinChanger*>(ToolboxPluginInstance());
         if (!instance || argc < 2) {
             status->blocked = false;
@@ -933,7 +933,7 @@ void SkinChanger::Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMO
         if (!iniToLoad.empty()) {
             instance->loadFromIniFile(iniToLoad.c_str());
         }
-    });
+    });*/
 
     GW::UI::RegisterUIMessageCallback(&UseItem_Entry, GW::UI::UIMessage::kSendUseItem, [&](GW::HookStatus*, GW::UI::UIMessage, void* wparam, void*) {
         if (!wparam) return;
@@ -993,12 +993,6 @@ void SkinChanger::Update(float)
             pendingMinipetTransmog = std::nullopt;
         });
     }
-}
-
-
-bool SkinChanger::CanTerminate()
-{
-    return GW::HookBase::GetInHookCount() == 0 && ToolboxPlugin::CanTerminate();
 }
 
 void SkinChanger::SignalTerminate()

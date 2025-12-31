@@ -25,18 +25,9 @@ namespace
     }
 }
 
-void PathingVisualizer::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_dll) {
-
-    ToolboxUIPlugin::Initialize(ctx, fns, toolbox_dll);
-}
-
 void PathingVisualizer::SignalTerminate()
 {
     ToolboxPlugin::SignalTerminate();
-}
-bool PathingVisualizer::CanTerminate()
-{
-    return true;
 }
 
 void PathingVisualizer::Terminate()
@@ -72,7 +63,6 @@ void PathingVisualizer::Update(float)
         const auto color = ImGui::ColorConvertFloat4ToU32({1.f, 1.f, 1.f, 1.f});
 
         RenderingUtils::addSingletonPolyline({GW::Agents::GetTargetAsAgentLiving()->pos, makePos(34)}, color);
-        // RenderingUtils::addSingletonPolyline({makePos(26), makePos(30), makePos(34), makePos(39)}, color);
     }
     else 
     {

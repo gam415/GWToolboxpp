@@ -1,6 +1,7 @@
 #include "TargetEverything.h"
 
 #include <GWCA/Utilities/Hooker.h>
+#include <GWCA/Managers/AgentMgr.h>
 #include <GWCA/GameEntities/Agent.h>
 
 DLLAPI ToolboxPlugin* ToolboxPluginInstance()
@@ -14,10 +15,18 @@ namespace
     void* getIsAgentTargettableFunc = nullptr;
 }
 
-bool isNotNull(const GW::Agent* agent)
+bool isTargetableOverride(const GW::Agent* agent)
 {
-    return agent;
+    if (!agent) return false;
+    if (const auto living = agent->GetAsAgentLiving()) {
+        return true;
+    }
+    else if (const auto gadget = agent->GetAsAgentGadget()) {
+        if (GW::Agents::GetAgentEncName(gadget)) return true;
+    }
+    return false;
 }
+
 
 void TargetEverything::Initialize(ImGuiContext* ctx, const ImGuiAllocFns allocator_fns, const HMODULE toolbox_dll)
 {
@@ -28,7 +37,7 @@ void TargetEverything::Initialize(ImGuiContext* ctx, const ImGuiAllocFns allocat
         getIsAgentTargettableFunc = GetProcAddress(gwca, "?GetIsAgentTargettable@Agents@GW@@YA_NPBUAgent@2@@Z");
         if (getIsAgentTargettableFunc) 
         {
-            GW::Hook::CreateHook((void**)&getIsAgentTargettableFunc, isNotNull, nullptr);
+            GW::Hook::CreateHook((void**)&getIsAgentTargettableFunc, isTargetableOverride, nullptr);
             GW::Hook::EnableHooks(getIsAgentTargettableFunc);
         }
     }

@@ -4,7 +4,10 @@
 
 #include <GWCA/Constants/QuestIDs.h>
 
-class DialogsWindow : public ToolboxUIPlugin {
+#include <IconsFontAwesome5.h>
+
+class DialogsWindow : public ToolboxUIPlugin 
+{
 public:
     DialogsWindow() { 
         can_close = true;

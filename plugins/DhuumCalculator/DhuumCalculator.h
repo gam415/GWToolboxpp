@@ -2,6 +2,8 @@
 
 #include <ToolboxUIPlugin.h>
 
+#include <IconsFontAwesome5.h>
+
 class DhuumCalculator : public ToolboxUIPlugin {
 public:
     DhuumCalculator() {}

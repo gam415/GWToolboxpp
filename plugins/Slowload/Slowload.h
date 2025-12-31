@@ -2,6 +2,8 @@
 
 #include <ToolboxPlugin.h>
 
+#include <IconsFontAwesome5.h>
+
 #include <GWCA/Utilities/Hook.h>
 #include <GWCA/Packets/StoC.h>
 
@@ -20,9 +22,7 @@ public:
     bool HasSettings() const override { return true; }
 
     void Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_dll) override;
-    bool CanTerminate() override;
     void SignalTerminate() override;
-    void Terminate() override;
 
 private:
     void stopSlowLoad();

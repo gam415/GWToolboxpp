@@ -46,8 +46,11 @@ namespace
         if (!skillData || (uint32_t)id >= (uint32_t)GW::Constants::SkillID::Count) return "";
 
         wchar_t out[8] = {0};
-        if (GW::UI::UInt32ToEncStr(skillData->name, out, _countof(out))) {
-            GW::UI::AsyncDecodeStr(out, &decodedNames[id]);
+        if (GW::UI::UInt32ToEncStr(skillData->name, out, _countof(out))) 
+        {
+            auto& decoded = decodedNames[id];
+            decoded.reserve(256);
+            GW::UI::AsyncDecodeStr(out, decoded.data(), 256);
         }
         return "";
     }
@@ -77,20 +80,13 @@ void ProjectileIndicator::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODU
 void ProjectileIndicator::SignalTerminate()
 {
     ToolboxPlugin::SignalTerminate();
-
     GW::StoC::RemoveCallback<GW::Packet::StoC::AgentProjectileLaunched>(&projectileHook);
-    GW::DisableHooks();
-}
-bool ProjectileIndicator::CanTerminate()
-{
-    return GW::HookBase::GetInHookCount() == 0;
 }
 
 void ProjectileIndicator::Terminate()
 {
     RenderingUtils::clearDrawingList();
     ToolboxPlugin::Terminate();
-    GW::Terminate();
 }
 
 void ProjectileIndicator::Draw(IDirect3DDevice9* device) 
@@ -228,9 +224,9 @@ void ProjectileIndicator::LoadSettings(const wchar_t* folder)
     filled = ini.GetBoolValue(Name(), VAR_NAME(filled), filled);
     projectileTimer = ini.GetLongValue(Name(), VAR_NAME(projectileTimer), projectileTimer);
 
-    trackedSkills = split(ini.GetValue(Name(), "skills", ""), GW::Constants::SkillID{});
+    trackedSkills = split(ini.GetValue(Name(), "skills", "3075 3074"), GW::Constants::SkillID{});
     trackedEnemyModels = split(ini.GetValue(Name(), "models", ""), int{});
-    suppressedProjecitileAnimationSources = split(ini.GetValue(Name(), "suppressed", ""), int{});
+    suppressedProjecitileAnimationSources = split(ini.GetValue(Name(), "suppressed", "2333"), int{});
 }
 
 void ProjectileIndicator::SaveSettings(const wchar_t* folder)

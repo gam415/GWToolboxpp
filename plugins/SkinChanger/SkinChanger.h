@@ -2,6 +2,8 @@
 
 #include <ToolboxUIPlugin.h>
 
+#include <IconsFontAwesome5.h>
+
 namespace GW 
 {
     struct ItemModifier;
@@ -60,7 +62,6 @@ public:
     void SaveSettings(const wchar_t*) override;
 
     void Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMODULE toolbox_dll) override;
-    bool CanTerminate() override;
     void SignalTerminate() override;
     void Terminate() override;
 

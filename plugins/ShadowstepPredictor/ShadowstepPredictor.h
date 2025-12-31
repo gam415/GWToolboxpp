@@ -7,6 +7,8 @@
 #include <GWCA/Constants/Skills.h>
 #include <GWCA/GameEntities/Pathing.h>
 
+#include <IconsFontAwesome5.h>
+
 #include <unordered_map>
 
 class ShadowstepPredictor : public ToolboxUIPlugin {
@@ -38,8 +40,6 @@ public:
 
     void Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMODULE toolbox_dll) override;
     void SignalTerminate() override;
-    bool CanTerminate() override;
-    void Terminate() override;
 
 private:
     std::unordered_map<GW::Constants::SkillID, OutcomeChances> chances;
