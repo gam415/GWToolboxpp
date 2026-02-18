@@ -7,7 +7,7 @@
 
 #include <GWCA/Utilities/Scanner.h>
 
-#include "PluginUtils.h"
+#include "ImGuiCppWrapper.h"
 
 namespace {
     static bool functionPtrIsInitialized = false;

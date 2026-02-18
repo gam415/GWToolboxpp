@@ -1,5 +1,7 @@
 #include "SpeedrunScriptingTools.h"
 
+#include <bitset>
+
 #include <ConditionIO.h>
 #include <ActionIO.h>
 #include <InstanceInfo.h>
@@ -1108,7 +1110,6 @@ bool SpeedrunScriptingTools::WndProc(const UINT Message, const WPARAM wParam, LP
 void SpeedrunScriptingTools::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_dll)
 {
     ToolboxPlugin::Initialize(ctx, fns, toolbox_dll);
-    GW::Initialize();
 
     GW::StoC::RegisterPostPacketCallback<GW::Packet::StoC::InstanceLoadFile>(&InstanceLoadFile_Entry, [this](GW::HookStatus*, const GW::Packet::StoC::InstanceLoadFile*) 
     {
@@ -1118,14 +1119,14 @@ void SpeedrunScriptingTools::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HM
 
         triggerScripts(Trigger::InstanceLoad, [](auto) { return true; }, false);
     });
-    RegisterUIMessageCallback(&Interrupt_Entry, GW::UI::UIMessage::kSpellCastInterrupted, [this](GW::HookStatus*, GW::UI::UIMessage, void* wparam, void*) {
+    GW::UI::RegisterUIMessageCallback(&Interrupt_Entry, GW::UI::UIMessage::kAgentSkillCancelled, [this](GW::HookStatus*, GW::UI::UIMessage, void* wparam, void*) {
         const auto parameters = *reinterpret_cast<SkillCastParameters*>(wparam);
         const auto player = GW::Agents::GetControlledCharacter();
         if (!player || parameters.agentId != player->agent_id) return;
 
         triggerScripts(Trigger::SkillCastInterrupt, [&](const Script& s){return s.triggerData.skillId == parameters.skillId || s.triggerData.skillId == GW::Constants::SkillID::No_Skill;});
     });
-    RegisterUIMessageCallback(&FinishSkillCast_Entry, GW::UI::UIMessage::kSkillCooldownStart, [this](GW::HookStatus*, GW::UI::UIMessage, void* wparam, void*) {
+    GW::UI::RegisterUIMessageCallback(&FinishSkillCast_Entry, GW::UI::UIMessage::kSkillCooldownStart, [this](GW::HookStatus*, GW::UI::UIMessage, void* wparam, void*) {
         struct CooldownStartMessage {
             uint32_t agentId;
             GW::Constants::SkillID skillId;
@@ -1139,7 +1140,7 @@ void SpeedrunScriptingTools::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HM
 
         triggerScripts(Trigger::BeginCooldown, [&](const Script& s){return s.triggerData.skillId == parameters.skillId || s.triggerData.skillId == GW::Constants::SkillID::No_Skill;});
     });
-    RegisterUIMessageCallback(&BeginSkillCast_Entry, GW::UI::UIMessage::kAgentStartCasting, [this](GW::HookStatus*, GW::UI::UIMessage, void* wparam, void*) {
+    GW::UI::RegisterUIMessageCallback(&BeginSkillCast_Entry, GW::UI::UIMessage::kAgentSkillStartedCast, [this](GW::HookStatus*, GW::UI::UIMessage, void* wparam, void*) {
         struct AgentCastMessage 
         {
             uint32_t agentId;
@@ -1180,7 +1181,7 @@ void SpeedrunScriptingTools::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HM
         triggerScripts(Trigger::DoaZoneComplete, [&](const Script& s){ return s.triggerData.doaZone == doaZone; });
     });
 
-    GW::Chat::CreateCommand(L"restore", [](GW::HookStatus* status, const wchar_t*, const int argc, const LPWSTR* argv) {
+    /* GW::Chat::CreateCommand(L"restore", [](GW::HookStatus* status, const wchar_t*, const int argc, const LPWSTR* argv) {
         const auto instance = static_cast<SpeedrunScriptingTools*>(ToolboxPluginInstance());
         if (!instance || argc < 2) {
             status->blocked = false;
@@ -1232,7 +1233,7 @@ void SpeedrunScriptingTools::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HM
         if (!iniToLoad.empty()) {
             instance->loadFromIniFile(iniToLoad.c_str());
         }
-    });
+    });*/
 
     InstanceInfo::getInstance().initialize();
     QuestInfo::getInstance().initialize();
@@ -1262,6 +1263,8 @@ bool SpeedrunScriptingTools::triggerScripts(Trigger triggerType, std::function<b
 
 void SpeedrunScriptingTools::SignalTerminate()
 {
+    ToolboxPlugin::SignalTerminate();
+
     InstanceInfo::getInstance().terminate();
     QuestInfo::getInstance().terminate();
 
@@ -1270,21 +1273,7 @@ void SpeedrunScriptingTools::SignalTerminate()
     GW::StoC::RemovePostCallback<GW::Packet::StoC::DisplayDialogue>(&DisplayDialogue_Entry);
     GW::StoC::RemovePostCallback<GW::Packet::StoC::DungeonReward>(&DungeonReward_Entry);
     GW::StoC::RemovePostCallback<GW::Packet::StoC::DoACompleteZone>(&DoACompleteZone_Entry);
-    RemoveUIMessageCallback(&Interrupt_Entry, GW::UI::UIMessage::kSpellCastInterrupted);
-    RemoveUIMessageCallback(&FinishSkillCast_Entry, GW::UI::UIMessage::kSkillCooldownStart);
-    RemoveUIMessageCallback(&BeginSkillCast_Entry, GW::UI::UIMessage::kAgentStartCasting);
-
-    GW::DisableHooks();
-    ToolboxPlugin::SignalTerminate();
-}
-
-bool SpeedrunScriptingTools::CanTerminate()
-{
-    return GW::HookBase::GetInHookCount() == 0;
-}
-
-void SpeedrunScriptingTools::Terminate()
-{
-    ToolboxPlugin::Terminate();
-    GW::Terminate();
+    GW::UI::RemoveUIMessageCallback(&Interrupt_Entry, GW::UI::UIMessage::kSkillCooldownStart);
+    GW::UI::RemoveUIMessageCallback(&FinishSkillCast_Entry, GW::UI::UIMessage::kSkillCooldownStart);
+    GW::UI::RemoveUIMessageCallback(&BeginSkillCast_Entry, GW::UI::UIMessage::kAgentSkillStartedCast);
 }

@@ -25,7 +25,7 @@
 
 #include "../GWToolboxdll/Widgets/Minimap/Shaders/game_world_renderer_vs.h"
 #include "../GWToolboxdll/Widgets/Minimap/Shaders/game_world_renderer_dotted_ps.h"
-#include "../GWToolboxdll/Widgets/Minimap/D3DVertex.h"
+#include "../GWToolboxdll/D3DContainers.h"
 #include <mapbox/earcut.hpp>
 
 namespace mapbox::util {

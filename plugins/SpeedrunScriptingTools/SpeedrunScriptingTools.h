@@ -7,6 +7,8 @@
 #include <ToolboxPlugin.h>
 #include <GWCA/Constants/Skills.h>
 
+#include <IconsFontAwesome5.h>
+
 struct Script {
     Script()
     { 
@@ -60,9 +62,7 @@ public:
     bool WndProc(UINT, WPARAM, LPARAM) override;
 
     void Initialize(ImGuiContext*, ImGuiAllocFns, HMODULE) override;
-    bool CanTerminate() override;
     void SignalTerminate() override;
-    void Terminate() override;
 
     bool triggerScripts(Trigger triggerType, std::function<bool(const Script&)> extraConditions = [](const Script&) { return true; }, bool checkConditions = true);
     void loadFromIniFile(const wchar_t*);

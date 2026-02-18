@@ -1,5 +1,7 @@
 #include <enumUtils.h>
 
+#include <bitset>
+
 #include <commonIncludes.h>
 #include <Keys.h>
 #include <ImGuiCppWrapper.h>
@@ -7,12 +9,19 @@
 #include <GWCA/Constants/Skills.h>
 #include <GWCA/Constants/Maps.h>
 #include <GWCA/GameEntities/Agent.h>
+#include <GWCA/GameEntities/Map.h>
 #include <GWCA/GameEntities/Skill.h>
 #include <GWCA/Managers/AgentMgr.h>
+#include <GWCA/Managers/MapMgr.h>
 #include <GWCA/Managers/SkillbarMgr.h>
 #include <GWCA/Managers/UIMgr.h>
 
 #include <ModelNames.h>
+
+namespace 
+{
+    std::unordered_map<GW::Constants::MapID, std::wstring> mapNames;
+}
 
 std::string getSkillName(GW::Constants::SkillID id, bool zeroIsAny)
 {
@@ -28,7 +37,9 @@ std::string getSkillName(GW::Constants::SkillID id, bool zeroIsAny)
 
     wchar_t out[8] = {0};
     if (GW::UI::UInt32ToEncStr(skillData->name, out, _countof(out))) {
-        GW::UI::AsyncDecodeStr(out, &decodedNames[id]);
+        auto& decoded = decodedNames[id];
+        decoded.reserve(256);
+        GW::UI::AsyncDecodeStr(out, decoded.data(), 256);
     }
     return "";
 }
@@ -1138,9 +1149,24 @@ void drawSkillIDSelector(GW::Constants::SkillID& id, bool zeroIsAny)
 void drawMapIDSelector(GW::Constants::MapID& id)
 {
     ImGui::PushItemWidth(50.f);
-    if (id != GW::Constants::MapID::None && (uint32_t)id < GW::Constants::NAME_FROM_ID.size()) {
-        ImGui::Text("%s", GW::Constants::NAME_FROM_ID[(uint32_t)id]);
-        ImGui::SameLine();
+    if (id != GW::Constants::MapID::None) 
+    {
+        if (mapNames.contains(id))
+        {
+            ImGui::Text("%s", WStringToString(mapNames[id]).c_str());
+            ImGui::SameLine();
+        }
+        else 
+        {
+            const auto map = GW::Map::GetMapInfo(id);
+            wchar_t encodedNameBuffer[8];
+            if (GW::UI::UInt32ToEncStr(map->name_id, encodedNameBuffer, 8)) 
+            {
+                auto& decoded = mapNames[id];
+                decoded.reserve(256);
+                GW::UI::AsyncDecodeStr(encodedNameBuffer, decoded.data(), 256);
+            }
+        }
     }
 
     ImGui::InputInt("Map ID", reinterpret_cast<int*>(&id), 0);

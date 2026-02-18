@@ -223,8 +223,9 @@ private:
     GoToTargetFinishCondition finishCondition = GoToTargetFinishCondition::DialogOpen;
 
     const GW::AgentLiving* target = nullptr;
-    mutable GW::HookEntry hook;
     mutable bool dialogHasPoppedUp = false;
+
+    inline static int goToTargetActionsRunning = 0;
 };
 
 class WaitAction : public Action {

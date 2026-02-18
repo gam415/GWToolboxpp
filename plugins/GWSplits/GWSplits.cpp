@@ -37,6 +37,7 @@ namespace {
     GW::HookEntry DisplayDialogue_Entry;
     GW::HookEntry DungeonReward_Entry;
     GW::HookEntry DoACompleteZone_Entry;
+    GW::HookEntry ChatCmd_HookEntry;
 
     static void onDisplayDialogDecoded(void* instancePtr, const wchar_t* decoded)
     {
@@ -1158,7 +1159,7 @@ void GWSplits::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_
         handleTrigger(Trigger::DoaZoneComplete, [&](const Split& s){ return s.triggerData.doaZone == doaZone; });
     });
 
-    GW::Chat::CreateCommand(L"restore", [](GW::HookStatus* status, const wchar_t*, const int argc, const LPWSTR* argv) {
+    /*GW::Chat::CreateCommand(L"restore", [](GW::HookStatus* status, const wchar_t*, const int argc, const LPWSTR* argv) {
         const auto instance = static_cast<GWSplits*>(ToolboxPluginInstance());
         if (!instance || argc < 2) {
             status->blocked = false;
@@ -1218,9 +1219,9 @@ void GWSplits::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_
         {
             instance->loadFromIniFile(iniToLoad.c_str());
         }
-    });
+    });*/
 
-    GW::Chat::CreateCommand(L"resetrun", [](GW::HookStatus*, const wchar_t*, const int, const LPWSTR*) {
+    GW::Chat::CreateCommand(&ChatCmd_HookEntry, L"resetrun", [](GW::HookStatus*, const wchar_t*, const int, const LPWSTR*) {
         const auto instance = static_cast<GWSplits*>(ToolboxPluginInstance());
         if (!instance) return;
 
@@ -1236,12 +1237,14 @@ void GWSplits::Initialize(ImGuiContext* ctx, ImGuiAllocFns fns, HMODULE toolbox_
 
 void GWSplits::SignalTerminate()
 {
+    ToolboxUIPlugin::SignalTerminate();
+
     GW::StoC::RemovePostCallback<GW::Packet::StoC::InstanceLoadInfo>(&InstanceLoadStart_Entry);
     GW::StoC::RemovePostCallback<GW::Packet::StoC::InstanceLoadInfo>(&InstanceTimer_Entry);
     GW::StoC::RemovePostCallback<GW::Packet::StoC::DisplayDialogue>(&DisplayDialogue_Entry);
     GW::StoC::RemovePostCallback<GW::Packet::StoC::DungeonReward>(&DungeonReward_Entry);
     GW::StoC::RemovePostCallback<GW::Packet::StoC::DoACompleteZone>(&DoACompleteZone_Entry);
-    ToolboxUIPlugin::SignalTerminate();
+    GW::Chat::DeleteCommand(&ChatCmd_HookEntry, L"resetrun");
 
     InstanceInfo::getInstance().terminate();
     QuestInfo::getInstance().terminate();

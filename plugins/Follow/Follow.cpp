@@ -105,5 +105,4 @@ void FollowPlugin::SignalTerminate()
     ToolboxPlugin::SignalTerminate();
 
     GW::Chat::DeleteCommand(&ChatCmd_HookEntry, L"follow");
-    GW::DisableHooks();
 }

@@ -159,7 +159,8 @@ std::string InstanceInfo::getDecodedAgentName(GW::AgentID id)
         }
 
         if (!encodedName) return "";
-        GW::UI::AsyncDecodeStr(encodedName, &wName);
+        wName.reserve(256);
+        GW::UI::AsyncDecodeStr(encodedName, wName.data(), 256);
     }
     return WStringToString(wName);
 }
@@ -176,7 +177,8 @@ std::string InstanceInfo::getDecodedItemName(uint32_t item_id)
         encodedName = item->single_item_name;
 
         if (!encodedName) return "";
-        GW::UI::AsyncDecodeStr(encodedName, &wName);
+        wName.reserve(256);
+        GW::UI::AsyncDecodeStr(encodedName, wName.data(), 256);
     }
 
     auto decoded = WStringToString(wName);

@@ -108,18 +108,31 @@ void QuestInfo::decodeStrings()
         for (auto& quest : *questLog) 
         {
             if (!decodedStrings.contains(quest.name)) 
-                GW::UI::AsyncDecodeStr(quest.name, &decodedStrings[quest.name]);
+            {
+                auto& decoded = decodedStrings[quest.name];
+                decoded.reserve(256);
+                GW::UI::AsyncDecodeStr(quest.name, decoded.data(), 256);
+            }
             if (!quest.objectives)
                 objectivesToDecode.push(&quest);
             else if (!decodedStrings.contains(quest.objectives)) 
-                GW::UI::AsyncDecodeStr(quest.objectives, &decodedStrings[quest.objectives]);
+            {
+                auto& decoded = decodedStrings[quest.objectives];
+                decoded.reserve(256);
+                GW::UI::AsyncDecodeStr(quest.objectives, decoded.data(), 256);
+            }
         }
     }
 
     for (const auto& objective : GW::GetWorldContext()->mission_objectives) 
     {
-        if (!decodedStrings.contains(objective.enc_str))
-            GW::UI::AsyncDecodeStr(getObjectiveContent(objective.enc_str).c_str(), &decodedStrings[objective.enc_str]);
+        if (!decodedStrings.contains(objective.enc_str)) 
+        {
+            auto& decoded = decodedStrings[objective.enc_str];
+            decoded.reserve(256);
+            GW::UI::AsyncDecodeStr(getObjectiveContent(objective.enc_str).c_str(), decoded.data(), 256);
+        }
+            
     }
 }
 
@@ -179,7 +192,12 @@ void QuestInfo::update()
     }
 
     GW::QuestMgr::RequestQuestInfo(quest);
-    if (quest->objectives)
-        GW::UI::AsyncDecodeStr(quest->objectives, &decodedStrings[quest->objectives]);
+    if (quest->objectives) 
+    {
+        auto& decoded = decodedStrings[quest->objectives];
+        decoded.reserve(256);
+        GW::UI::AsyncDecodeStr(quest->objectives, decoded.data(), 256);
+    }
+        
     objectivesToDecode.pop();
 }

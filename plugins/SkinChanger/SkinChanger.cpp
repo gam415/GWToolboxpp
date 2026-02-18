@@ -26,6 +26,7 @@
 #include <GWCA/Utilities/Hooker.h>
 
 #include "PluginUtils.h"
+#include "ImGuiCppWrapper.h"
 #include "BackupManager.h"
 
 #include <sstream>
@@ -825,7 +826,6 @@ void SkinChanger::loadFromIniFile(const wchar_t* filePath)
 void SkinChanger::Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMODULE toolbox_dll)
 {
     ToolboxPlugin::Initialize(ctx, allocator_fns, toolbox_dll);
-    GW::Initialize();
 
     // minipetTransmogs.push_back(MinipetTransmog{36651, 350, 0x564EB, 12, 0x3d67, 0x40d97, 98820});
     //minipetTransmogs.push_back(MinipetTransmog{36651, 350, "0x564EB", {"My custom name", 12, "0x3d67", "0x40d97", "0x18204"}});
@@ -1002,12 +1002,4 @@ void SkinChanger::SignalTerminate()
     GW::StoC::RemovePostCallback<GW::Packet::StoC::InstanceLoadFile>(&InstanceLoadFile_Entry);
     GW::UI::RemoveUIMessageCallback(&UseItem_Entry, GW::UI::UIMessage::kSendUseItem);
     GW::StoC::RemoveCallbacks(&AgentAdd_Entry);
-
-    GW::DisableHooks();
-}
-
-void SkinChanger::Terminate()
-{
-    ToolboxPlugin::Terminate();
-    GW::Terminate();
 }

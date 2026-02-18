@@ -219,7 +219,7 @@ namespace GW {
             kMessage_0x1000005a,            // 0x1000005a
             kSkillActivated,                // 0x1000005b, wparam ={ uint32_t agent_id , uint32_t skill_id }
             kMessage_0x1000005c,            // 0x1000005c
-            kMessage_0x1000005d,            // 0x1000005d
+            kSkillCooldownStart,            // 0x1000005d
             kUpdateSkillbar,                // 0x1000005e, wparam ={ uint32_t agent_id , ... }
             kUpdateSkillsAvailable,         // 0x1000005f, Triggered on a skill unlock, profession change or map load
             kMessage_0x10000060,            // 0x10000060

@@ -14,6 +14,7 @@
 #include <GWCA/Utilities/Scanner.h>
 
 #include "PluginUtils.h"
+#include "ImGuiCppWrapper.h"
 
 namespace CtoS 
 {

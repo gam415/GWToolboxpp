@@ -63,7 +63,6 @@ public:
 
     void Initialize(ImGuiContext* ctx, ImGuiAllocFns allocator_fns, HMODULE toolbox_dll) override;
     void SignalTerminate() override;
-    void Terminate() override;
 
     void Update(float) override;
 

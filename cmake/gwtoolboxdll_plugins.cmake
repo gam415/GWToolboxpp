@@ -9,6 +9,8 @@ target_sources(plugin_base INTERFACE
     "plugins/Base/toolbox_default_font.h"
     "plugins/Base/imgui_impl_dx9.h"
     "plugins/Base/imgui_impl_dx9.cpp"
+    "plugins/Base/ImGuiCppWrapper.h"
+    "plugins/Base/ImGuiCppWrapper.cpp"
     "plugins/Base/ToolboxPlugin.h"
     "plugins/Base/ToolboxPlugin.cpp"
     "plugins/Base/Pathing.h"
@@ -54,8 +56,6 @@ target_sources(scripting INTERFACE
     "plugins/Scripting/Enums.h"
     "plugins/Scripting/enumUtils.h"
     "plugins/Scripting/enumUtils.cpp"
-    "plugins/Scripting/ImGuiCppWrapper.h"
-    "plugins/Scripting/ImGuiCppWrapper.cpp"
     "plugins/Scripting/InstanceInfo.h"
     "plugins/Scripting/InstanceInfo.cpp"
     "plugins/Scripting/io.h"
@@ -91,7 +91,6 @@ macro(add_tb_plugin PLUGIN)
     target_sources(${PLUGIN} PRIVATE ${SOURCES})
     target_include_directories(${PLUGIN} PRIVATE "${PROJECT_SOURCE_DIR}/plugins/${PLUGIN}")
     target_link_libraries(${PLUGIN} PRIVATE plugin_base)
-    target_link_libraries(${PLUGIN} PRIVATE scripting)
     target_compile_options(${PLUGIN} PRIVATE /wd4201 /wd4505)
     target_compile_options(${PLUGIN} PRIVATE /W4 /WX /Gy)
     target_compile_options(${PLUGIN} PRIVATE $<$<NOT:$<CONFIG:Debug>>:/GL>)
@@ -107,7 +106,6 @@ add_tb_plugin(AgentPopTimer)
 add_tb_plugin(DeathPenaltyTimer)
 add_tb_plugin(DhuumCalculator)
 add_tb_plugin(DialogsWindow)
-add_tb_plugin(ExamplePlugin)
 add_tb_plugin(FlatBowRangeIndicator)
 add_tb_plugin(Follow)
 add_tb_plugin(GWSplits)
@@ -122,4 +120,7 @@ add_tb_plugin(Slowload)
 add_tb_plugin(SpeedrunScriptingTools)
 add_tb_plugin(TargetEverything)
 
+
+target_link_libraries(GWSplits PRIVATE scripting)
+target_link_libraries(SpeedrunScriptingTools PRIVATE scripting)
 target_compile_options(GWSplits PRIVATE /D LiveSplitMode)

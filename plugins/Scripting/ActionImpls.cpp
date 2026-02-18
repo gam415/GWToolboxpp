@@ -42,6 +42,7 @@ namespace {
     const std::string endOfListToken = ">";
     constexpr float indent = 25.f;
     constexpr double eps = 1e-3;
+    GW::HookEntry goToTargetActionHook;
 
     GW::Constants::Bag toGwcaBag(Bag bag)
     {
@@ -138,8 +139,7 @@ namespace {
     {
         using namespace std::chrono_literals;
         GW::AgentLiving* p = GW::Agents::GetControlledCharacter();
-        const GW::Skillbar* s = GW::SkillbarMgr::GetPlayerSkillbar();
-        if (!item || !p || p->GetIsDead() || p->GetIsKnockedDown() || (s && s->casting)) return;
+        if (!item || !p || p->GetIsDead() || p->GetIsKnockedDown() || p->GetIsCasting()) return;
         if (p->skill) {
             GW::GameThread::Enqueue([]{ GW::UI::Keypress(GW::UI::ControlAction_CancelAction); });
             std::this_thread::sleep_for(10ms);
@@ -985,8 +985,9 @@ void GoToTargetAction::initialAction()
     if (!target || target->allegiance == GW::Constants::Allegiance::Enemy) return;
 
     dialogHasPoppedUp = false;
+    ++goToTargetActionsRunning;
     
-    GW::UI::RegisterUIMessageCallback(&hook, GW::UI::UIMessage::kDialogBody, [this, id = target->agent_id](GW::HookStatus*, GW::UI::UIMessage, void* wparam, void*) {
+    GW::UI::RegisterUIMessageCallback(&goToTargetActionHook, GW::UI::UIMessage::kDialogBody, [this, id = target->agent_id](GW::HookStatus*, GW::UI::UIMessage, void* wparam, void*) {
         const auto packet = static_cast<GW::UI::DialogBodyInfo*>(wparam);
         if (packet->agent_id == id)
             dialogHasPoppedUp = true;
@@ -997,7 +998,11 @@ void GoToTargetAction::initialAction()
 void GoToTargetAction::finalAction()
 {
     Action::finalAction();
-    GW::UI::RemoveUIMessageCallback(&hook, GW::UI::UIMessage::kDialogBody);
+    --goToTargetActionsRunning;
+    if (goToTargetActionsRunning < 1) 
+    {
+        GW::UI::RemoveUIMessageCallback(&goToTargetActionHook, GW::UI::UIMessage::kDialogBody);
+    }
 }
 ActionStatus GoToTargetAction::isComplete() const
 {
@@ -2544,8 +2549,9 @@ void LoadSkillbarAction::initialAction()
     }
     else if (const auto heroIndex = getHeroIndex(heroId)) 
     {
-        GW::GameThread::Enqueue([heroIndex, build = this->build] {
-            GW::SkillbarMgr::LoadSkillTemplate(build.c_str(), *heroIndex);
+        GW::GameThread::Enqueue([heroIndex, build = this->build] 
+        {
+            GW::SkillbarMgr::LoadSkillTemplate(GW::Agents::GetHeroAgentID(*heroIndex), build.c_str());
         });
     }
 }

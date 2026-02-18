@@ -7,6 +7,8 @@
 #include <CharacteristicIO.h>
 #include <ScriptVariables.h>
 
+#include <bitset>
+
 #include <GWCA/Constants/Constants.h>
 
 #include <GWCA/GameEntities/Agent.h>
