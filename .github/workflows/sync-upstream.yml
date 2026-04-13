@@ -1,0 +1,73 @@
+name: Sync upstream branches
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # upstream (parent fork) branches
+          - local_branch: upstream-master
+            remote: upstream
+            remote_branch: master
+          - local_branch: upstream-dev
+            remote: upstream
+            remote_branch: dev
+          # gwtasdevs (gwtasdevs/GWToolboxpp) branches
+          - local_branch: gwtasdevs-master
+            remote: gwtasdevs
+            remote_branch: master
+          - local_branch: gwtasdevs-dev
+            remote: gwtasdevs
+            remote_branch: dev
+          # jaborgw (JaborGW/GWToolboxpp) branches
+          - local_branch: jaborgw-combined-plugin-branch
+            remote: jaborgw
+            remote_branch: combined-plugin-branch
+
+    steps:
+      - name: Resolve source URL for upstream
+        id: resolve
+        if: matrix.remote == 'upstream'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: repoData } = await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+            });
+            if (!repoData.parent) {
+              core.setFailed('This repo is not a fork – cannot resolve "upstream".');
+              return;
+            }
+            const url = `https://github.com/${repoData.parent.full_name}.git`;
+            core.info(`Upstream URL: ${url}`);
+            core.setOutput('url', url);
+
+      - name: Sync ${{ matrix.local_branch }} ← ${{ matrix.remote }}/${{ matrix.remote_branch }}
+        env:
+          SOURCE_URL: ${{ matrix.remote == 'upstream' && steps.resolve.outputs.url || format('https://github.com/{0}/{1}.git', matrix.remote, github.event.repository.name) }}
+          LOCAL_BRANCH: ${{ matrix.local_branch }}
+          REMOTE_BRANCH: ${{ matrix.remote_branch }}
+          TARGET: ${{ format('https://x-access-token:{0}@github.com/{1}/{2}.git', secrets.SYNC_TOKEN, github.repository_owner, github.event.repository.name) }}
+        run: |
+          git init repo
+          cd repo
+          git remote add source "$SOURCE_URL"
+          git remote add target "$TARGET"
+          git fetch source "$REMOTE_BRANCH"
+          git push target "FETCH_HEAD:refs/heads/$LOCAL_BRANCH" --force
