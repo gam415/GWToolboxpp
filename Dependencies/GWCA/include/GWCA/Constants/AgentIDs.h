@@ -189,14 +189,14 @@ namespace GW {
                 constexpr int KeeperOfSouls = 2323;
                 constexpr int TerrorwebQueen = 2324; // boss-like
                 constexpr int SmiteCrawler = 2325;
-                constexpr int WailingLord = 2326; // Note: same as FoW::Banshee
-                constexpr int BanishedDreamRider = 2327;
+                constexpr int WailingLord = 2376; // Note: same as FoW::Banshee
+                constexpr int BanishedDreamRider = 2377;
                 // 2324 ?
                 constexpr int FourHorseman = 2329; // all four share the same id
-                constexpr int MindbladeSpectre = 2330;
+                constexpr int MindbladeSpectre = 2380;
 
-                constexpr int DeadCollector = 2332;
-                constexpr int DeadThresher = 2333;
+                constexpr int DeadCollector = 2382;
+                constexpr int DeadThresher = 2383;
                 constexpr int ColdfireNight = 2334;
                 constexpr int StalkingNight = 2335;
                 // 2332 ?
@@ -233,7 +233,7 @@ namespace GW {
             } // namespace UW
 
             namespace FoW {
-                constexpr int Banshee = 2377; // Note: same as UW::WailingLord
+                constexpr int Banshee = 2376; // Note: same as UW::WailingLord
 
                 constexpr int MahgoHydra = 2847;
                 constexpr int ArmoredCaveSpider = 2851;
