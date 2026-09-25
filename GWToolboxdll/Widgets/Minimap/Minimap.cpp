@@ -124,6 +124,7 @@ namespace {
 
     bool hide_compass_agents = false;
     bool hide_compass_drawings = false;
+    bool hide_compass_pings = false;
     bool hide_compass_quest_marker = false;
     bool render_all_quests = false;
 
@@ -787,6 +788,7 @@ void Minimap::Initialize()
     SettingsRegistry::RegisterField(this, "render_all_quests", &render_all_quests);
     SettingsRegistry::RegisterField(this, "hide_compass_quest_marker", &hide_compass_quest_marker);
     SettingsRegistry::RegisterField(this, "hide_compass_drawings", &hide_compass_drawings);
+    SettingsRegistry::RegisterField(this, "hide_compass_pings", &hide_compass_pings);
     SettingsRegistry::RegisterField(this, "hide_flagging_controls", &hide_flagging_controls);
     SettingsRegistry::RegisterField(this, "hide_compass_when_minimap_draws", &hide_compass_when_minimap_draws);
     register_color("color_map", &color_map);
@@ -836,6 +838,7 @@ void Minimap::Initialize()
                                           GW::UI::UIMessage::kChangeTarget,
                                           GW::UI::UIMessage::kSkillActivated,
                                           GW::UI::UIMessage::kCompassDraw,
+                                          GW::UI::UIMessage::kCompassPing,
                                           GW::UI::UIMessage::kEnableUIPositionOverlay,
                                           GW::UI::UIMessage::kDestroyUIPositionOverlay};
     for (const auto message_id : hook_messages) {
@@ -867,8 +870,12 @@ void Minimap::OnUIMessage(GW::HookStatus* status, const GW::UI::UIMessage msgid,
             break;
         case GW::UI::UIMessage::kCompassDraw: {
             ASSERT(wParam);
-            if (hide_compass_drawings) status->blocked = true;
+            const auto packet = (GW::UI::UIPacket::kCompassDraw*)wParam;
+            status->blocked |= packet->number_of_points > 1 ? hide_compass_drawings : hide_compass_pings;
         } break;
+        case GW::UI::UIMessage::kCompassPing:
+            status->blocked |= hide_compass_pings;
+            break;
         case GW::UI::UIMessage::kMapLoaded: {
             in_interface_settings = false;
             EnsureCompassIsLoaded();
@@ -1031,6 +1038,7 @@ void Minimap::DrawSettingsInternal()
     ImGui::CheckboxWithHelp("Draw all quest markers", &render_all_quests, "Draw quest markers for all quests in your quest log, not just the active quest");
 
     ImGui::CheckboxWithHelp("Hide GW compass drawings", &hide_compass_drawings, "Drawings made by other players will be visible on the minimap, but not the compass");
+    ImGui::CheckboxWithHelp("Hide GW compass pings", &hide_compass_pings, "Pings made by other players will be visible on the minimap, but not the compass");
     if (ImGui::Checkbox("Hide GW compass when minimap is visible", &hide_compass_when_minimap_draws)) {
         GW::GameThread::Enqueue(OverrideCompassVisibility);
     }
