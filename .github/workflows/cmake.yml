@@ -274,6 +274,12 @@ jobs:
         echo "Detected dev commit: $DEV_COMMIT_SHORT"
         echo "Target tag: $TAG_NAME"
 
+        if [ -n "$BETA" ]; then
+          echo "prerelease=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "prerelease=false" >> "$GITHUB_OUTPUT"
+        fi
+
         # Check if tag exists
         if git show-ref --tags --quiet --verify "refs/tags/$TAG_NAME"; then
           if [ -n "$DEV_COMMIT_SHORT" ]; then

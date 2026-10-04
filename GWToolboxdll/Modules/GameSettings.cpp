@@ -65,7 +65,7 @@
 #include <Utils/TextUtils.h>
 
 #pragma warning(disable : 6011)
-#pragma comment(lib, "Version.lib")
+#pragma comment(lib, "version.lib")
 
 using namespace GuiUtils;
 using namespace ToolboxUtils;
@@ -137,7 +137,6 @@ namespace {
     clock_t activity_timer = 0;
 
     bool skip_characters_from_another_campaign_prompt = true;
-    bool remove_window_border_in_windowed_mode = false;
 
     bool was_leading = true;
 
@@ -247,7 +246,6 @@ namespace {
         {GW::Constants::SkillID::Heal_Area, GW::Constants::SkillID::Kareis_Healing_Circle},
         {GW::Constants::SkillID::Heal_Other, GW::Constants::SkillID::Jameis_Gaze},
         {GW::Constants::SkillID::Holy_Strike, GW::Constants::SkillID::Stonesoul_Strike},
-        {GW::Constants::SkillID::Symbol_of_Wrath, GW::Constants::SkillID::Kirins_Wrath},
 
         {GW::Constants::SkillID::Desecrate_Enchantments, GW::Constants::SkillID::Defile_Enchantments},
         {GW::Constants::SkillID::Shadow_Strike, GW::Constants::SkillID::Lifebane_Strike},
@@ -1044,48 +1042,6 @@ namespace {
         }
     }
 
-    void CheckRemoveWindowBorder()
-    {
-        // @TODO: When frame is removed, the game "expands" to fill the space, but the UI is still offset as if its factoring in the for title bar. Intercept SetWindowPos on the game side instead of doing this???
-        const auto pref = GW::UI::GetPreference(GW::UI::NumberPreference::ScreenBorderless);
-        // Log::Log("Pref changed %d", pref);
-        if (remove_window_border_in_windowed_mode && pref == 0) {
-            const auto hwnd = GW::MemoryMgr::GetGWWindowHandle();
-            if (!hwnd) return;
-
-            auto remove_styles = (WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
-            auto lStyle = GetWindowLong(hwnd, GWL_STYLE);
-
-            if (!lStyle) return;
-            if ((lStyle & remove_styles) != 0) {
-                lStyle &= ~remove_styles;
-                SetWindowLong(hwnd, GWL_STYLE, lStyle);
-            }
-
-            remove_styles = (WS_EX_DLGMODALFRAME | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE);
-            lStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-            if ((lStyle & remove_styles) != 0) {
-                lStyle &= ~remove_styles;
-                // SetWindowLong(hwnd, GWL_EXSTYLE, lStyle);
-            }
-            // SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle);
-
-            // SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER);
-
-            // Display close/restore/min buttons top right
-            GW::UI::SetFrameVisible(GW::UI::GetFrameByLabel(L"BtnMin"), true);
-            GW::UI::SetFrameVisible(GW::UI::GetFrameByLabel(L"BtnRestore"), false); // @TODO: Show this, but make it maximise the window on click instead
-            GW::UI::SetFrameVisible(GW::UI::GetFrameByLabel(L"BtnExit"), true);
-        }
-        // pref 0 = windowed; any other mode (borderless, fullscreen, etc.) hides window buttons if the user opted in
-        if (pref != 0) {
-            const bool visible = !settings.hide_window_buttons_in_fullscreen;
-            GW::UI::SetFrameVisible(GW::UI::GetFrameByLabel(L"BtnMin"), visible);
-            GW::UI::SetFrameVisible(GW::UI::GetFrameByLabel(L"BtnRestore"), visible);
-            GW::UI::SetFrameVisible(GW::UI::GetFrameByLabel(L"BtnExit"), visible);
-        }
-    }
-
     // Pre-fill character name when donating faction
     void SkipCharacterNameEntryForFactionDonation(bool immediate = true)
     {
@@ -1237,10 +1193,6 @@ namespace {
                 // Automatically send a party window invite when a party search invite is sent
                 const auto packet = static_cast<GW::UI::UIPacket::kPartySearchInvite*>(wParam);
                 if (GW::PartyMgr::GetIsLeader()) GW::PartyMgr::InvitePlayer(GetPartySearchLeader(packet->source_party_search_id));
-            } break;
-            case GW::UI::UIMessage::kPreferenceValueChanged: {
-                const auto packet = static_cast<GW::UI::UIPacket::kPreferenceValueChanged*>(wParam);
-                if (packet->preference_id == GW::UI::NumberPreference::ScreenBorderless) CheckRemoveWindowBorder();
             } break;
             case GW::UI::UIMessage::kPartyDefeated: {
                 if (settings.auto_return_on_defeat && GW::PartyMgr::GetIsLeader()) GW::PartyMgr::ReturnToOutpost() || (Log::Warning("Failed to return to outpost"), true);
@@ -1607,7 +1559,6 @@ void GameSettings::Initialize()
 
     constexpr GW::UI::UIMessage post_ui_messages[] = {
         GW::UI::UIMessage::kPartySearchInviteSent,
-        GW::UI::UIMessage::kPreferenceValueChanged,
         GW::UI::UIMessage::kMapLoaded,
         GW::UI::UIMessage::kTradeSessionStart,
         GW::UI::UIMessage::kShowCancelEnterMissionBtn,
@@ -1939,10 +1890,6 @@ void GameSettings::DrawSettingsInternal()
         SetWindowTitle(settings.set_window_title_as_charname);
     }
 
-    if (ImGui::Checkbox("Hide minimize/restore/close buttons in borderless and fullscreen modes", &settings.hide_window_buttons_in_fullscreen)) {
-        GW::GameThread::Enqueue(CheckRemoveWindowBorder);
-    }
-
     ImGui::Checkbox("Show warning when earned faction reaches ", &settings.faction_warn_percent);
     ImGui::SameLine();
     ImGui::PushItemWidth(40.0f * ImGui::FontScale());
@@ -2001,8 +1948,11 @@ void GameSettings::DrawSettingsInternal()
     ImGui::Unindent();
     ImGui::NewLine();
     ImGui::Checkbox("Show 'You have N Lockpicks' on Locked Chest name tags", &settings.show_amount_of_lockpicks_under_locked_chest_nametag);
-    ImGui::Text("In-game name tag colors:");
+    if (ImGui::Checkbox("In-game name tag colors", &settings.override_name_tag_colors)) {
+        nametag_color_cache.clear();
+    }
     ImGui::ShowHelp("These set global name tag colors by category.\nTo set a custom color for a specific agent, see Minimap > Custom Agents > Text Color.");
+    ImGui::BeginDisabled(!settings.override_name_tag_colors);
     ImGui::Indent();
     ImGui::StartSpacedElements(checkbox_w);
     constexpr uint32_t flags = ImGuiColorEditFlags_NoInputs;
@@ -2011,6 +1961,7 @@ void GameSettings::DrawSettingsInternal()
         Colors::DrawSettingHueWheel(c.label, c.ptr, flags);
     }
     ImGui::Unindent();
+    ImGui::EndDisabled();
 
     ImGui::NewLine();
     ImGui::Text("Hide skill descriptions in:");
@@ -2428,7 +2379,7 @@ void GameSettings::OnWriteChat(GW::HookStatus* status, GW::UI::UIMessage, void* 
 // Auto-drop UA when recasting
 void GameSettings::OnAgentStartCast(GW::HookStatus*, GW::UI::UIMessage, void* wParam, void*)
 {
-    const auto packet = static_cast<GW::UI::UIPacket::kAgentSkillPacket*>(wParam);
+    const auto packet = static_cast<GW::UI::UIPacket::kAgentSkillStartedCast*>(wParam);
     if (settings.drop_ua_on_cast && packet && packet->skill_id == GW::Constants::SkillID::Unyielding_Aura) {
         const auto buffs = GW::Effects::GetAgentBuffs(packet->agent_id);
         if (buffs) {
@@ -2495,46 +2446,44 @@ void GameSettings::OnUpdateSkillCount(GW::HookStatus*, void* packet)
     }
 }
 
-// Default colour for agent name tags
 void GameSettings::OnAgentNameTag(GW::HookStatus*, const GW::UI::UIMessage msgid, void* wParam, void*)
 {
     if (msgid != GW::UI::UIMessage::kShowAgentNameTag && msgid != GW::UI::UIMessage::kSetAgentNameTagAttribs) {
         return;
     }
     const auto tag = static_cast<GW::UI::AgentNameTagInfo*>(wParam);
-    // Apply default colors for nametags
-    for (const auto& c : nametag_color_settings) {
-        if (c.player_override) {
-            continue;
-        }
-        if (tag->text_color == static_cast<Color>(c.default_val)) {
-            tag->text_color = *c.ptr;
-            break;
-        }
-    }
-    // Override colors for friends, guildies and party members
-    if (tag->name_enc) {
-        const auto player_name = TextUtils::GetPlayerNameFromEncodedString(tag->name_enc);
-        if (!player_name.empty() && player_name != GetPlayerName()) {
-            const auto cached = nametag_color_cache.find(player_name);
-            if (cached != nametag_color_cache.end()) {
-                tag->text_color = cached->second;
+    if (settings.override_name_tag_colors) {
+        for (const auto& c : nametag_color_settings) {
+            if (c.player_override) {
+                continue;
             }
-            else {
-                if (GW::FriendListMgr::GetFriend(nullptr, player_name.c_str(), GW::FriendType::Friend)) {
-                    tag->text_color = settings.nametag_color_friends;
-                }
-                else if (IsGuildMemberPlayer(player_name.c_str())) {
-                    tag->text_color = settings.nametag_color_guild_members;
-                }
-                else if (IsAgentInMyParty(tag->agent_id)) {
-                    tag->text_color = settings.nametag_color_player_in_my_party;
-                }
-                nametag_color_cache[player_name] = tag->text_color;
+            if (tag->text_color == static_cast<Color>(c.default_val)) {
+                tag->text_color = *c.ptr;
+                break;
             }
         }
+        if (tag->name_enc) {
+            const auto player_name = TextUtils::GetPlayerNameFromEncodedString(tag->name_enc);
+            if (!player_name.empty() && player_name != GetPlayerName()) {
+                const auto cached = nametag_color_cache.find(player_name);
+                if (cached != nametag_color_cache.end()) {
+                    tag->text_color = cached->second;
+                }
+                else {
+                    if (GW::FriendListMgr::GetFriend(nullptr, player_name.c_str(), GW::FriendType::Friend)) {
+                        tag->text_color = settings.nametag_color_friends;
+                    }
+                    else if (IsGuildMemberPlayer(player_name.c_str())) {
+                        tag->text_color = settings.nametag_color_guild_members;
+                    }
+                    else if (IsAgentInMyParty(tag->agent_id)) {
+                        tag->text_color = settings.nametag_color_player_in_my_party;
+                    }
+                    nametag_color_cache[player_name] = tag->text_color;
+                }
+            }
+        }
     }
-    // Show amount of lockpicks under locked chest nametag
     if (settings.show_amount_of_lockpicks_under_locked_chest_nametag && tag->name_enc && wcseq(tag->name_enc, GW::EncStrings::LockedChest) && !tag->underline) {
         static wchar_t you_have_n_lockpicks[12];
         const auto count = GW::Items::CountItemByModelId(GW::Constants::ItemID::Lockpick, (int)GW::Constants::Bag::Backpack, (int)GW::Constants::Bag::Bag_2);

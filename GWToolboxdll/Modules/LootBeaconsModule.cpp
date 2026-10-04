@@ -10,6 +10,7 @@
 #include <GWCA/Managers/ChatMgr.h>
 #include <GWCA/Managers/ItemMgr.h>
 #include <GWCA/Managers/MapMgr.h>
+#include <GWCA/Managers/UIMgr.h>
 
 #include <Color.h>
 #include <D3DContainers.h>
@@ -33,7 +34,8 @@
 // namespace) so glaze's reflection can create the required external-linkage template specialisation.
 struct NameBeacon {
     std::string match;
-    Colors::SettingColor color = Colors::ARGB(170, 0, 255, 255);
+    Colors::SettingColor color = Colors::Empty();
+    GW::Constants::Rarity rarity = GW::Constants::Rarity::Unknown;
     bool enabled = true;
 };
 
@@ -41,7 +43,8 @@ namespace {
     constexpr int kMaxBuildsPerFrame = 4;   // caps terrain-drape heightfield builds spent per frame
     constexpr int kDrapeGrid = 16;          // heightfield resolution sampled across a beacon's footprint
     constexpr int kRingDivs = 16;           // ring quad subdivision, so the sprite bends to follow the ground
-    constexpr uint32_t kScanIntervalMs = 250; // item agents don't move; classification only needs a coarse tick
+    constexpr uint64_t kScanIntervalMs = 1000;
+    constexpr uint64_t kNameDecodeRetryMs = 5000;
     constexpr uint32_t kRingTextureFileId = 0x2381; // GW dat texture for the pulsing ring sprite
 
     // Not user-configurable.
@@ -78,34 +81,13 @@ namespace {
 
     std::vector<NameBeacon> name_beacons;
 
-    struct CachedName {
-        GuiUtils::EncString enc;
-        std::wstring decoded;
-    };
-    std::map<std::wstring, CachedName> decoded_item_names; // keyed by the encoded name
-
-    // Decoded item name, or nullptr while the async decode is still pending (a scan tick or two).
-    const std::wstring* DecodedItemName(const GW::Item& item)
-    {
-        const wchar_t* name_enc = nullptr;
-        if (item.single_item_name && *item.single_item_name) name_enc = item.single_item_name;
-        else if (item.name_enc && *item.name_enc) name_enc = item.name_enc;
-        if (!name_enc) return nullptr;
-        auto& cached = decoded_item_names[name_enc];
-        if (cached.decoded.empty()) {
-            cached.decoded = cached.enc.reset(name_enc)->wstring();
-            if (cached.decoded.empty()) return nullptr;
-        }
-        return &cached.decoded;
-    }
-
-    // Parsed form of the enabled rules; rebuilt only when the list changes, since building a regex isn't free.
     struct CompiledNameBeacon {
         TextUtils::SearchPattern<wchar_t> pattern;
         Color color = 0;
+        GW::Constants::Rarity rarity = GW::Constants::Rarity::Unknown;
     };
     std::vector<CompiledNameBeacon> compiled_name_beacons;
-    std::vector<size_t> invalid_name_beacons; // rules whose regex didn't parse, flagged in the settings panel
+    std::vector<size_t> invalid_name_beacons;
     bool name_beacons_dirty = true;
 
     void CompileNameBeacons()
@@ -121,11 +103,11 @@ namespace {
                 invalid_name_beacons.push_back(i);
                 continue;
             }
-            compiled_name_beacons.emplace_back(std::move(pattern), name_beacon.color.value);
+            compiled_name_beacons.emplace_back(std::move(pattern), name_beacon.color.value, name_beacon.rarity);
         }
     }
 
-    constexpr int kRarityBeaconAlpha = 170; // beam/ring alpha; the palette itself is opaque (0xFF)
+    constexpr int kRarityBeaconAlpha = 170;
 
     // A rarity beacon isn't user-colourable: it always takes the exact hue the client paints the
     // item's name (GW::Chat::TextColor), so the beacon matches the nametag drawn for that drop.
@@ -157,15 +139,19 @@ namespace {
 
     struct Beacon {
         GW::Vec2f pos;
-        float z = 0.f; // the item agent's own world height; GW up is -z
+        float z = 0.f;
         uint32_t zplane = 0;
+        uint32_t item_id = 0;
         Color color = 0;
         bool draw = false;
         bool dimmed = false;
-        bool draped = false; // heightfield resolved once (items don't move), then sampled every frame
+        bool draped = false;
+        bool draped_without_pathing = false;
         bool ring_cached = false;
         uint32_t seen = 0;
-        float field[kDrapeGrid + 1][kDrapeGrid + 1] = {}; // terrain z sampled across pos +/- kFieldRadius
+        uint64_t name_decode_tick = 0;
+        GuiUtils::EncString name;
+        float field[kDrapeGrid + 1][kDrapeGrid + 1] = {};
         std::vector<RingVertex> ring_outer, ring_inner;
     };
 
@@ -175,6 +161,8 @@ namespace {
     uint32_t scan_counter = 0;
     uint64_t last_scan_tick = 0;
     bool beacons_dirty = false;
+    bool pending_full_scan = false;
+    GW::HookEntry agent_ui_message_entry;
     int compositor_token = 0;
 
     IDirect3DVertexShader9* ring_vs = nullptr;
@@ -232,6 +220,7 @@ namespace {
             }
         }
         beacon.draped = true;
+        beacon.draped_without_pathing = !n_planes;
     }
 
     // Appends a textured ring quad subdivided into a kRingDivs grid, each vertex dropped onto the cached
@@ -284,24 +273,40 @@ namespace {
         }
     }
 
-    void Classify(const GW::AgentItem& agent_item, const GW::Item& item, const uint32_t my_agent_id, Beacon& beacon)
+    void Classify(const GW::AgentItem* agent_item, const GW::Item* item, const std::wstring_view item_name = {})
     {
-        const bool mine = !agent_item.owner || agent_item.owner == my_agent_id;
+        if (!(agent_item && item)) return;
+        if (name_beacons_dirty) CompileNameBeacons();
+        auto& beacon = beacons[agent_item->agent_id];
+        beacon.seen = scan_counter;
+        if (beacon.draped && (beacon.pos.x != agent_item->pos.x || beacon.pos.y != agent_item->pos.y ||
+                              beacon.z != agent_item->z || beacon.zplane != agent_item->pos.zplane)) {
+            beacon.draped = false;
+            beacon.ring_cached = false;
+            beacon.ring_outer.clear();
+            beacon.ring_inner.clear();
+        }
+        beacon.pos = {agent_item->pos.x, agent_item->pos.y};
+        beacon.z = agent_item->z;
+        beacon.zplane = agent_item->pos.zplane;
+        const bool mine = !agent_item->owner || agent_item->owner == GW::Agents::GetControlledCharacterId();
         beacon.dimmed = !mine;
         Color color = 0;
         bool draw = false;
         if (mine || show_reserved_for_others) {
-            // Name rules outrank value and rarity, and the first one that matches wins - so the user
-            // can order the list by priority.
-            if (const auto* item_name = compiled_name_beacons.empty() ? nullptr : DecodedItemName(item)) {
+            const auto rarity = GW::Items::GetRarity(item);
+            if (!item_name.empty()) {
                 for (const auto& name_beacon : compiled_name_beacons) {
-                    if (!name_beacon.pattern.Matches(*item_name)) continue;
-                    beacon.color = name_beacon.color;
+                    if (name_beacon.rarity != GW::Constants::Rarity::Unknown && name_beacon.rarity != rarity) continue;
+                    if (!name_beacon.pattern.Matches(item_name)) continue;
+                    const auto rarity_color = RarityBeaconColor(rarity);
+                    beacon.color = Colors::IsVisible(name_beacon.color) ? name_beacon.color
+                                 : rarity_color ? rarity_color : Colors::ARGB(kRarityBeaconAlpha, 0, 255, 255);
                     beacon.draw = true;
                     return;
                 }
             }
-            const uint32_t price = PriceCheckerModule::GetPriceByItem(&item);
+            const uint32_t price = PriceCheckerModule::GetPriceByItem(item);
             const ValueBeacon* by_value = nullptr;
             for (const auto* value : {&value_low, &value_high}) {
                 if (value->enabled && value->threshold > 0 && price >= static_cast<uint32_t>(value->threshold)) {
@@ -313,7 +318,6 @@ namespace {
                 draw = true;
             }
             else {
-                const auto rarity = GW::Items::GetRarity(&item);
                 const RarityBeacon* by_rarity = nullptr;
                 switch (rarity) {
                     case GW::Constants::Rarity::White: by_rarity = &rarity_white; break;
@@ -333,29 +337,89 @@ namespace {
         beacon.draw = draw;
     }
 
+    void ProcessItemAgent(const GW::AgentItem* agent_item, const GW::Item* item)
+    {
+        if (!(agent_item && item)) return;
+        if (name_beacons_dirty) CompileNameBeacons();
+        auto& beacon = beacons[agent_item->agent_id];
+        if (beacon.item_id != agent_item->item_id) {
+            beacon = Beacon{};
+            beacon.item_id = agent_item->item_id;
+        }
+        if (compiled_name_beacons.empty()) {
+            Classify(agent_item, item);
+            return;
+        }
+        const wchar_t* name_enc = item->single_item_name && *item->single_item_name ? item->single_item_name : item->name_enc;
+        if (name_enc && *name_enc) {
+            const auto now = GetTickCount64();
+            if (beacon.name.encoded() != name_enc ||
+                (now - beacon.name_decode_tick >= kNameDecodeRetryMs && beacon.name.wstring().empty())) {
+                beacon.name.reset(static_cast<const wchar_t*>(nullptr));
+                beacon.name_decode_tick = now;
+            }
+            const auto& item_name = beacon.name.reset(name_enc)->wstring();
+            Classify(agent_item, item, item_name);
+            return;
+        }
+        Classify(agent_item, item);
+    }
+
     void ScanItems()
     {
         ++scan_counter;
+        beacons_dirty = false;
         const auto* agents = GW::Agents::GetAgentArray();
         if (!agents) {
             beacons.clear();
             return;
         }
-        const auto my_agent_id = GW::Agents::GetControlledCharacterId();
-        if (name_beacons_dirty) CompileNameBeacons();
         for (const auto* agent : *agents) {
             const auto* agent_item = agent ? agent->GetAsAgentItem() : nullptr;
-            if (!agent_item) continue;
-            const auto* item = GW::Items::GetItemById(agent_item->item_id);
-            if (!item) continue;
-            auto& beacon = beacons[agent_item->agent_id];
-            beacon.seen = scan_counter;
-            beacon.pos = {agent_item->pos.x, agent_item->pos.y};
-            beacon.z = agent_item->z;
-            beacon.zplane = agent_item->pos.zplane;
-            Classify(*agent_item, *item, my_agent_id, beacon);
+            ProcessItemAgent(agent_item, agent_item ? GW::Items::GetItemById(agent_item->item_id) : nullptr);
         }
         std::erase_if(beacons, [](const auto& entry) { return entry.second.seen != scan_counter; });
+    }
+
+    void OnPostUIMessage(GW::HookStatus*, const GW::UI::UIMessage message_id, void* wparam, void*)
+    {
+        switch (message_id) {
+            case GW::UI::UIMessage::kShowAgentNameTag: {
+                const auto* info = static_cast<const GW::UI::AgentNameTagInfo*>(wparam);
+                if (!info || beacons.contains(info->agent_id)) break;
+                const auto* agent = GW::Agents::GetAgentByID(info->agent_id);
+                const auto* agent_item = agent ? agent->GetAsAgentItem() : nullptr;
+                ProcessItemAgent(agent_item, agent_item ? GW::Items::GetItemById(agent_item->item_id) : nullptr);
+                break;
+            }
+            case GW::UI::UIMessage::kAgentDestroy:
+                beacons.erase(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(wparam)));
+                break;
+            case GW::UI::UIMessage::kMapLoaded:
+                beacons.clear();
+                pending_full_scan = true;
+                last_scan_tick = 0;
+                break;
+            default:
+                break;
+        }
+    }
+
+    void RefreshBeacons()
+    {
+        if (!beacons_dirty) return;
+        beacons_dirty = false;
+        for (auto it = beacons.begin(); it != beacons.end();) {
+            const auto* agent = GW::Agents::GetAgentByID(it->first);
+            const auto* agent_item = agent ? agent->GetAsAgentItem() : nullptr;
+            const auto* item = agent_item ? GW::Items::GetItemById(agent_item->item_id) : nullptr;
+            if (!item) {
+                it = beacons.erase(it);
+                continue;
+            }
+            ProcessItemAgent(agent_item, item);
+            ++it;
+        }
     }
 
     constexpr float kBeamSolidFraction = 0.25f; // bottom fraction of the beam height that stays fully solid before fading
@@ -423,16 +487,17 @@ void LootBeaconsModule::DrawInWorld(IDirect3DDevice9* device)
         beacons.clear();
         return;
     }
-    if (beacons_dirty) {
-        last_scan_tick = 0;
-        beacons_dirty = false;
-    }
-
     const auto now = GetTickCount64();
-    if (now - last_scan_tick >= kScanIntervalMs) {
-        last_scan_tick = now;
+    if (pending_full_scan && GW::Map::GetIsMapLoaded() && !GW::UI::IsLoadingScreenShown() && GW::Agents::GetAgentArray()) {
         ScanItems();
+        pending_full_scan = false;
+        last_scan_tick = now;
     }
+    else if (!pending_full_scan && now - last_scan_tick >= kScanIntervalMs) {
+        ScanItems();
+        last_scan_tick = now;
+    }
+    RefreshBeacons();
     if (beacons.empty()) return;
 
     if (!ring_texture_requested) {
@@ -468,13 +533,19 @@ void LootBeaconsModule::DrawInWorld(IDirect3DDevice9* device)
         const float focus_dx = beacon.pos.x - focus_x;
         const float focus_dy = beacon.pos.y - focus_y;
         if (cam && focus_dx * focus_dx + focus_dy * focus_dy > GW::Constants::SqrRange::Compass) continue;
+        EmitBeamQuad(scratch, beacon.pos, beacon.z, right_x, right_y, beacon.color, beacon.dimmed ? kBeamOpacity * 0.4f : kBeamOpacity);
+        if (beacon.draped_without_pathing && n_planes) {
+            beacon.draped = false;
+            beacon.ring_cached = false;
+            beacon.ring_outer.clear();
+            beacon.ring_inner.clear();
+        }
         if (!beacon.draped) {
-            if (!n_planes || builds >= kMaxBuildsPerFrame) continue;
+            if (builds >= kMaxBuildsPerFrame) continue;
             ++builds;
             BuildDrape(beacon, n_planes);
         }
         if (!beacon.ring_cached) BuildRingCache(beacon);
-        EmitBeamQuad(scratch, beacon.pos, beacon.z, right_x, right_y, beacon.color, beacon.dimmed ? kBeamOpacity * 0.4f : kBeamOpacity);
 
         // Ring opacity comes straight from the beacon colour's own alpha channel; dimmed (reserved for
         // other party members) is the one exception, same as the beam.
@@ -536,6 +607,16 @@ void LootBeaconsModule::Initialize()
 {
     ToolboxModule::Initialize();
     RegisterSettings(this);
+    pending_full_scan = true;
+    last_scan_tick = 0;
+    const GW::UI::UIMessage ui_messages[] = {
+        GW::UI::UIMessage::kShowAgentNameTag,
+        GW::UI::UIMessage::kAgentDestroy,
+        GW::UI::UIMessage::kMapLoaded,
+    };
+    for (const auto message_id : ui_messages) {
+        GW::UI::RegisterUIMessageCallback(&agent_ui_message_entry, message_id, OnPostUIMessage, 0x4000);
+    }
     if (!compositor_token) compositor_token = GameWorldCompositor::RegisterDraw(&LootBeaconsModule::DrawInWorld);
 }
 
@@ -545,8 +626,10 @@ void LootBeaconsModule::SignalTerminate()
         GameWorldCompositor::UnregisterDraw(compositor_token);
         compositor_token = 0;
     }
+    GW::UI::RemoveUIMessageCallback(&agent_ui_message_entry);
     beacons.clear();
-    decoded_item_names.clear();
+    pending_full_scan = false;
+    last_scan_tick = 0;
 }
 
 void LootBeaconsModule::LoadSettings(SettingsDoc& doc, ToolboxIni* legacy)
@@ -566,28 +649,34 @@ void LootBeaconsModule::SaveSettings(SettingsDoc& doc)
 void LootBeaconsModule::DrawSettingsInternal()
 {
     const auto red = ImGui::ColorConvertU32ToFloat4(Colors::Red());
-    if (!GameWorldCompositor::IsActive())
-        ImGui::TextColored(red, GameWorldCompositor::HasFailed() ? "In-world compositor FAILED to install." : "In-world compositor: not installed yet.");
+    if (GameWorldCompositor::HasFailed())
+        ImGui::TextColored(red, "In-world compositor FAILED to install.");
+    else if (GameWorldCompositor::IsActive())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(Colors::Green()), "In-world compositor active.");
+    else
+        ImGui::TextDisabled("In-world compositor: not installed yet.");
 
     ImGui::TextUnformatted("Beacon by gold value");
     ImGui::ShowHelp("Any drop whose trader price (Kamadan, or presearing.com's price sheet while pre-searing) meets a threshold gets a beacon,\nregardless of rarity - catches ectos, gemstones, dyes and other white-rarity valuables.\nAn item that clears both thresholds uses the higher tier's colour.");
     for (auto* value : {&value_low, &value_high}) {
         ImGui::PushID(value->label);
-        if (ImGui::Checkbox("##enabled", &value->enabled)) beacons_dirty = true;
+        bool changed = ImGui::Checkbox("##enabled", &value->enabled);
         ImGui::SameLine();
         ImGui::SetNextItemWidth(100.f);
-        ImGui::DragInt("##threshold", &value->threshold, 50.f, 0, 1000000);
+        changed |= ImGui::DragInt("##threshold", &value->threshold, 50.f, 0, 1000000);
         ImGui::SameLine(180.f);
-        Colors::DrawSettingHueWheel("##color", &value->color);
+        changed |= Colors::DrawSettingHueWheel("##color", &value->color);
         ImGui::PopID();
+        if (changed) beacons_dirty = true;
     }
     ImGui::Separator();
-    ImGui::TextUnformatted("Beacon by item name");
-    ImGui::ShowHelp("Any drop whose name contains the text gets a beacon in the colour next to it, whatever its rarity or value.\n"
+    ImGui::TextUnformatted("Custom item beacons");
+    ImGui::ShowHelp("Any drop whose name contains the text gets a beacon in its rarity colour by default, whatever its value.\n"
                     "Matching ignores case and uses the item name as it's shown in-game, e.g. \"scroll\" or \"glob of ectoplasm\".\n"
                     "Text wrapped in slashes is a regular expression instead, e.g. /^Superb Charr Carving$/ - add flags after\n"
                     "the closing slash as in the chat filter (I turns case sensitivity back on).\n"
-                    "Name rules are checked first; the first matching rule in this list wins.");
+                    "Use the colour picker to override the default colour; transparent uses the default. Name rules are checked first;\n"
+                    "the first matching rule in this list wins.");
     if (name_beacons_dirty) CompileNameBeacons();
     for (size_t i = 0; i < name_beacons.size(); i++) {
         auto& name_beacon = name_beacons[i];
@@ -597,7 +686,15 @@ void LootBeaconsModule::DrawSettingsInternal()
         ImGui::SetNextItemWidth(160.f);
         changed |= ImGui::InputText("##match", name_beacon.match, 64);
         ImGui::SameLine(240.f);
-        changed |= Colors::DrawSettingHueWheel("##color", &name_beacon.color.value);
+        changed |= Colors::DrawSettingHueWheel("##color", &name_beacon.color.value, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar);
+        ImGui::SameLine();
+        int rarity_index = name_beacon.rarity == GW::Constants::Rarity::Unknown ? 0 : static_cast<int>(name_beacon.rarity) + 1;
+        constexpr const char* rarity_names[] = {"Any Rarity", "White", "Blue", "Purple", "Gold", "Green"};
+        ImGui::SetNextItemWidth(100.f);
+        if (ImGui::Combo("##rarity", &rarity_index, rarity_names, std::size(rarity_names))) {
+            name_beacon.rarity = rarity_index ? static_cast<GW::Constants::Rarity>(rarity_index - 1) : GW::Constants::Rarity::Unknown;
+            changed = true;
+        }
         ImGui::SameLine();
         const bool remove = ImGui::Button("x##delete");
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Delete");
@@ -617,7 +714,7 @@ void LootBeaconsModule::DrawSettingsInternal()
             break;
         }
     }
-    if (ImGui::Button("Add item name")) {
+    if (ImGui::Button("Add item beacon")) {
         name_beacons.emplace_back();
         beacons_dirty = true;
         name_beacons_dirty = true;

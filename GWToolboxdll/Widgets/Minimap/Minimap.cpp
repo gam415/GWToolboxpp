@@ -124,6 +124,7 @@ namespace {
 
     bool hide_compass_agents = false;
     bool hide_compass_drawings = false;
+    bool hide_compass_pings = false;
     bool hide_compass_quest_marker = false;
     bool render_all_quests = false;
 
@@ -322,12 +323,24 @@ namespace {
     }
 
     CompassContext* compass_context = nullptr;
+    std::map<uint32_t, clock_t> compass_drawing_sessions;
 
     void __cdecl OnCompassFrame_UICallback(GW::UI::InteractionMessage* message, void* wParam, void* lParam)
     {
         GW::Hook::EnterHook();
 
         compass_context = message->wParam ? *(CompassContext**)message->wParam : nullptr;
+        const auto forward_message = [&] {
+            if (compass_context && hide_flagging_controls) {
+                const auto prev = compass_context->ai_controls;
+                compass_context->ai_controls = nullptr;
+                OnCompassFrame_UICallback_Ret(message, wParam, lParam);
+                compass_context->ai_controls = prev;
+            }
+            else {
+                OnCompassFrame_UICallback_Ret(message, wParam, lParam);
+            }
+        };
         switch (message->message_id) {
             case GW::UI::UIMessage::kFrameMessage_0x44: {
                 if (OverrideCompassVisibility()) {
@@ -347,6 +360,7 @@ namespace {
                 OnCompassFrame_UICallback_Ret(message, wParam, lParam);
                 compass_context = nullptr;
                 compass_frame = nullptr;
+                compass_drawing_sessions.clear();
                 compass_fix_pending = false;
                 compass_position_dirty = true;
                 break;
@@ -371,17 +385,29 @@ namespace {
                     message->message_id = prev;
                 }
                 break;
+            case GW::UI::UIMessage::kCompassDraw:
+            case GW::UI::UIMessage::kCompassPing: {
+                bool block_compass_message = message->message_id == GW::UI::UIMessage::kCompassPing && hide_compass_pings;
+                if (message->message_id == GW::UI::UIMessage::kCompassDraw && wParam) {
+                    const auto packet = static_cast<GW::UI::UIPacket::kCompassDraw*>(wParam);
+                    ASSERT(packet->player_number < 0xffff && packet->session_id < 0xffff);
+                    const auto session_key = (packet->player_number << 16) | static_cast<uint16_t>(packet->session_id);
+                    const auto found = compass_drawing_sessions.find(session_key);
+                    const auto continuing_drawing = found != compass_drawing_sessions.end() && TIMER_DIFF(found->second) <= 5000;
+                    if (packet->number_of_points != 1 || continuing_drawing) {
+                        compass_drawing_sessions[session_key] = TIMER_INIT();
+                        block_compass_message = hide_compass_drawings;
+                    }
+                    else {
+                        block_compass_message = hide_compass_pings;
+                    }
+                }
+                if (block_compass_message) break;
+                forward_message();
+                break;
+            }
             default:
-                if (compass_context && hide_flagging_controls) {
-                    // Temporarily nullify the pointer to flagging controls for all other message ids
-                    const auto prev = compass_context->ai_controls;
-                    compass_context->ai_controls = nullptr;
-                    OnCompassFrame_UICallback_Ret(message, wParam, lParam);
-                    compass_context->ai_controls = prev;
-                }
-                else {
-                    OnCompassFrame_UICallback_Ret(message, wParam, lParam);
-                }
+                forward_message();
                 break;
         }
 
@@ -390,16 +416,16 @@ namespace {
 
     GW::UI::Frame* GetCompassFrame()
     {
-        if (compass_frame) return compass_frame;
-        compass_frame = GW::UI::GetFrameByLabel(L"Compass");
-        if (compass_frame) {
-            ASSERT(compass_frame->frame_callbacks.size());
-            if (!OnCompassFrame_UICallback_Func) {
-                OnCompassFrame_UICallback_Func = compass_frame->frame_callbacks[0].callback;
+        if (!compass_frame) {
+            compass_frame = GW::UI::GetFrameByLabel(L"Compass");
+            if (compass_frame) compass_position_dirty = true;
+        }
+        if (compass_frame && !OnCompassFrame_UICallback_Func && compass_frame->frame_callbacks.size()) {
+            OnCompassFrame_UICallback_Func = compass_frame->frame_callbacks[0].callback;
+            if (OnCompassFrame_UICallback_Func) {
                 GW::Hook::CreateHook((void**)&OnCompassFrame_UICallback_Func, OnCompassFrame_UICallback, reinterpret_cast<void**>(&OnCompassFrame_UICallback_Ret));
                 GW::Hook::EnableHooks(OnCompassFrame_UICallback_Func);
             }
-            compass_position_dirty = true;
         }
         return compass_frame;
     }
@@ -787,6 +813,7 @@ void Minimap::Initialize()
     SettingsRegistry::RegisterField(this, "render_all_quests", &render_all_quests);
     SettingsRegistry::RegisterField(this, "hide_compass_quest_marker", &hide_compass_quest_marker);
     SettingsRegistry::RegisterField(this, "hide_compass_drawings", &hide_compass_drawings);
+    SettingsRegistry::RegisterField(this, "hide_compass_pings", &hide_compass_pings);
     SettingsRegistry::RegisterField(this, "hide_flagging_controls", &hide_flagging_controls);
     SettingsRegistry::RegisterField(this, "hide_compass_when_minimap_draws", &hide_compass_when_minimap_draws);
     register_color("color_map", &color_map);
@@ -836,6 +863,7 @@ void Minimap::Initialize()
                                           GW::UI::UIMessage::kChangeTarget,
                                           GW::UI::UIMessage::kSkillActivated,
                                           GW::UI::UIMessage::kCompassDraw,
+                                          GW::UI::UIMessage::kCompassPing,
                                           GW::UI::UIMessage::kEnableUIPositionOverlay,
                                           GW::UI::UIMessage::kDestroyUIPositionOverlay};
     for (const auto message_id : hook_messages) {
@@ -865,12 +893,9 @@ void Minimap::OnUIMessage(GW::HookStatus* status, const GW::UI::UIMessage msgid,
             in_interface_settings = (uint32_t)wParam == 1;
             compass_position_dirty = true;
             break;
-        case GW::UI::UIMessage::kCompassDraw: {
-            ASSERT(wParam);
-            if (hide_compass_drawings) status->blocked = true;
-        } break;
         case GW::UI::UIMessage::kMapLoaded: {
             in_interface_settings = false;
+            compass_drawing_sessions.clear();
             EnsureCompassIsLoaded();
             instance.pmap_renderer.Invalidate();
             GameWorldRenderer::TriggerSyncAllMarkers();
@@ -1031,6 +1056,7 @@ void Minimap::DrawSettingsInternal()
     ImGui::CheckboxWithHelp("Draw all quest markers", &render_all_quests, "Draw quest markers for all quests in your quest log, not just the active quest");
 
     ImGui::CheckboxWithHelp("Hide GW compass drawings", &hide_compass_drawings, "Drawings made by other players will be visible on the minimap, but not the compass");
+    ImGui::CheckboxWithHelp("Hide GW compass pings", &hide_compass_pings, "Pings made by other players will be visible on the minimap, but not the compass");
     if (ImGui::Checkbox("Hide GW compass when minimap is visible", &hide_compass_when_minimap_draws)) {
         GW::GameThread::Enqueue(OverrideCompassVisibility);
     }
@@ -1159,23 +1185,23 @@ void Minimap::DrawSettingsInternal()
     ImGui::SameLine();
     ImGui::TextDisabled(" - Define behaviour of holding keyboard keys and clicking the minimap.");
     ImGui::Indent();
-    ImGui::PushItemWidth(140.f);
+    ImGui::PushItemWidth(-1.f);
     ImGui::TextUnformatted("Draw: ");
     ImGui::ShowHelp("Ping and draw on the compass.");
-    ImGui::SameLine(140.f);
+    ImGui::SameLine(100.f);
     ImGui::Combo("##Draw_key", reinterpret_cast<int*>(&MinimapModifierBehaviour_Keymap[MinimapModifierBehaviour::Draw]), available_modifiers_combo, _countof(available_modifiers_combo));
     ImGui::TextUnformatted("Target: ");
     ImGui::ShowHelp("Click to target agents.");
-    ImGui::SameLine(140.f);
+    ImGui::SameLine(100.f);
     ImGui::Combo("##Target", reinterpret_cast<int*>(&MinimapModifierBehaviour_Keymap[MinimapModifierBehaviour::Target]), available_modifiers_combo, _countof(available_modifiers_combo));
     ImGui::CheckboxWithHelp("Target gadgets", &target_gadgets_on_ctrl_click, "Allow clicking the minimap to target gadgets (e.g. chests, signposts) as well as living agents.");
     ImGui::TextUnformatted("Drag: ");
     ImGui::ShowHelp("Drag the minimap outside of compass range.");
-    ImGui::SameLine(140.f);
+    ImGui::SameLine(100.f);
     ImGui::Combo("##Drag", reinterpret_cast<int*>(&MinimapModifierBehaviour_Keymap[MinimapModifierBehaviour::Drag]), available_modifiers_combo, _countof(available_modifiers_combo));
     ImGui::TextUnformatted("MoveTo: ");
     ImGui::ShowHelp("Start walking character to selected location.");
-    ImGui::SameLine(140.f);
+    ImGui::SameLine(100.f);
     ImGui::Combo("##MoveTo", reinterpret_cast<int*>(&MinimapModifierBehaviour_Keymap[MinimapModifierBehaviour::MoveTo]), available_modifiers_combo, _countof(available_modifiers_combo));
     ImGui::PopItemWidth();
     ImGui::Unindent();
