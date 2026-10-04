@@ -56,13 +56,11 @@ Pcon::Pcon(const char* chatname,
            const char* abbrevname,
            const char* ininame,
            const wchar_t* filename_,
-           const ImVec2 uv0_, const ImVec2 uv1_, const int threshold_,
+           const int threshold_,
            const char* desc_)
     : threshold(threshold_)
     , filename(filename_)
     , timer(TIMER_INIT())
-    , uv0(uv0_)
-    , uv1(uv1_)
 {
     enabled = settings_by_charname[L"default"] = new bool(false);
     if (desc_) {
@@ -129,6 +127,11 @@ void Pcon::Draw(IDirect3DDevice9*)
 {
     const auto t = GetTexture();
     if (!(t && *t)) return;
+    if (!uv_resolved) {
+        // Crop to the icon's opaque content (squared) so the square button never stretches it
+        uv_resolved = true;
+        ImGui::GetOpaqueContentUv(*t, &uv0, &uv1);
+    }
     const ImVec2 pos = ImGui::GetCursorPos();
     const ImVec2 s(size, size);
     const ImVec4 bg = IsEnabled() ? ImColor(enabled_bg_color.value).Value : ImVec4(0, 0, 0, 0);
@@ -178,6 +181,7 @@ void Pcon::Draw(IDirect3DDevice9*)
 void Pcon::Terminate()
 {
     texture = nullptr;
+    uv_resolved = false;
 }
 
 void Pcon::Update(int delay)
