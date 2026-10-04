@@ -47,11 +47,11 @@ protected:
          const char* abbrevname,
          const char* ininame,
          const wchar_t* filename,
-         ImVec2 uv0, ImVec2 uv1, int threshold,
+         int threshold,
          const char* desc = nullptr);
 
     Pcon(const wchar_t* file, const int threshold = 20)
-        : Pcon(nullptr, nullptr, nullptr, file, {0, 0}, {1, 1}, threshold) { }
+        : Pcon(nullptr, nullptr, nullptr, file, threshold) { }
 
     Pcon(const Pcon&) = delete;
 
@@ -143,8 +143,10 @@ protected:
 private:
     static std::map<GW::Constants::SkillID, clock_t> effect_triggered_at;
     IDirect3DTexture9** texture = nullptr;
-    const ImVec2 uv0 = {0, 0};
-    const ImVec2 uv1 = {1, 1};
+    // Opaque-content crop of the icon, resolved from the texture alpha on first draw.
+    ImVec2 uv0 = {0, 0};
+    ImVec2 uv1 = {1, 1};
+    bool uv_resolved = false;
 };
 
 class PconGeneric : public Pcon {
@@ -153,11 +155,10 @@ public:
                 const char* abbrev,
                 const char* ini,
                 const wchar_t* file,
-                const ImVec2 uv0, const ImVec2 uv1,
                 const DWORD item, const std::initializer_list<GW::Constants::SkillID> effects,
                 const int threshold,
                 const char* desc = nullptr)
-        : Pcon(chat, abbrev, ini, file, uv0, uv1, threshold, desc),
+        : Pcon(chat, abbrev, ini, file, threshold, desc),
           itemID(item), effectIDs(effects) { }
 
     PconGeneric(const PconGeneric&) = delete;
@@ -180,11 +181,10 @@ public:
              const char* abbrev,
              const char* ini,
              const wchar_t* file,
-             const ImVec2 uv0, const ImVec2 uv1,
              const DWORD item, const std::initializer_list<GW::Constants::SkillID> effects,
              const int threshold,
              const char* desc = nullptr)
-        : PconGeneric(chat, abbrev, ini, file, uv0, uv1, item, effects, threshold, desc) { }
+        : PconGeneric(chat, abbrev, ini, file, item, effects, threshold, desc) { }
 
     PconCons(const PconCons&) = delete;
 
@@ -197,10 +197,9 @@ public:
              const char* abbrev,
              const char* ini,
              const wchar_t* file,
-             const ImVec2 uv0, const ImVec2 uv1,
              const int threshold,
              const char* desc = nullptr)
-        : Pcon(chat, abbrev, ini, file, uv0, uv1, threshold, desc) { }
+        : Pcon(chat, abbrev, ini, file, threshold, desc) { }
 
     PconCity(const PconCity&) = delete;
 
@@ -214,7 +213,7 @@ public:
 class PconRefiller : public PconCity {
 public:
     PconRefiller(const wchar_t* file, const DWORD item, const int threshold = 250)
-        : PconRefiller(nullptr, nullptr, nullptr, file, {0, 0}, {1, 1}, item, threshold)
+        : PconRefiller(nullptr, nullptr, nullptr, file, item, threshold)
     {
         visible = false;
     };
@@ -223,11 +222,10 @@ public:
                  const char* abbrev,
                  const char* ini,
                  const wchar_t* file,
-                 const ImVec2 uv0, const ImVec2 uv1,
                  const DWORD item,
                  const int threshold,
                  const char* desc_ = nullptr)
-        : PconCity(chat, abbrev, ini, file, uv0, uv1, threshold, desc_), itemID(item)
+        : PconCity(chat, abbrev, ini, file, threshold, desc_), itemID(item)
     {
         if (!desc.empty()) {
             desc += "\n";
@@ -256,10 +254,9 @@ public:
                 const char* abbrev,
                 const char* ini,
                 const wchar_t* file,
-                const ImVec2 uv0, const ImVec2 uv1,
                 const int threshold,
                 const char* desc = nullptr)
-        : Pcon(chat, abbrev, ini, file, uv0, uv1, threshold, desc) { }
+        : Pcon(chat, abbrev, ini, file, threshold, desc) { }
 
     PconAlcohol(const PconAlcohol&) = delete;
 
@@ -274,10 +271,9 @@ public:
               const char* abbrev,
               const char* ini,
               const wchar_t* file,
-              const ImVec2 uv0, const ImVec2 uv1,
               const int threshold,
               const char* desc = nullptr)
-        : Pcon(chat, abbrev, ini, file, uv0, uv1, threshold, desc) { }
+        : Pcon(chat, abbrev, ini, file, threshold, desc) { }
 
     PconLunar(const PconLunar&) = delete;
 
@@ -292,10 +288,9 @@ public:
              const char* abbrev,
              const char* ini,
              const wchar_t* file,
-             const ImVec2 uv0, const ImVec2 uv1,
              const int threshold,
              const char* desc = nullptr)
-        : Pcon(chat, abbrev, ini, file, uv0, uv1, threshold, desc) { }
+        : Pcon(chat, abbrev, ini, file, threshold, desc) { }
 
     PconScroll(const PconCity&) = delete;
 

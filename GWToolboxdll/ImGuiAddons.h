@@ -1,5 +1,7 @@
 #pragma once
 
+#include <span>
+
 namespace ABI::Windows::UI { struct Color; }
 using Color = ImU32;
 
@@ -62,6 +64,8 @@ namespace ImGui {
     IMGUI_API bool MyCombo(const char* label, const char* preview_text, int* current_item,
                            bool (*items_getter)(void* data, int idx, const char** out_text), void* data, int items_count);
 
+    IMGUI_API bool MultiSelectCombo(const char* label, uint32_t* selected, std::span<const char* const> items);
+
     // Show a popup on-screen with a message and yes/no buttons. Returns true if an option has been chosen, with *result as true/false for yes/no
     IMGUI_API void ConfirmDialog(const char* message, ImGui::ImGuiConfirmDialogCallback callback, void* wparam = nullptr);
 
@@ -102,6 +106,8 @@ namespace ImGui {
     IMGUI_API void AddImageCropped(ImTextureID user_texture_id, const ImVec2& top_left, const ImVec2& bottom_right);
     // Calculate the end position of a crop box for the given texture to fit into the given size
     IMGUI_API ImVec2 CalculateUvCrop(ImTextureID user_texture_id, const ImVec2& size);
+    // Fill uv0/uv1 with the square region of the texture that tightly contains its non-transparent pixels (32-bit alpha formats only). False if the texture can't be read, in which case the outputs are untouched.
+    IMGUI_API bool GetOpaqueContentUv(ImTextureID user_texture_id, ImVec2* uv0_out, ImVec2* uv1_out);
 
     IMGUI_API bool ColorPalette(const char* label, size_t* palette_index, const ImVec4* palette, size_t count, size_t max_per_line, ImGuiColorEditFlags flags);
 
